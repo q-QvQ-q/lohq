@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  {/* 背景 - 白色圆角方形 */}
+  <rect width="512" height="512" rx="96" fill="#FFFFFF"/>
+  {/* 左耳 */}
+  <path d="M102 166 Q82 42 174 104 Q194 156 154 186 Z" fill="#5C3A1E"/>
+  <path d="M122 158 Q110 84 162 114 Q174 150 150 166 Z" fill="#F4C2C2"/>
+  {/* 右耳 */}
+  <path d="M410 166 Q430 42 338 104 Q318 156 358 186 Z" fill="#5C3A1E"/>
+  <path d="M390 158 Q402 84 350 114 Q338 150 362 166 Z" fill="#F4C2C2"/>
+  {/* 头部 - 浅棕色正圆 */}
+  <circle cx="256" cy="286" r="178" fill="#D4A574"/>
+  {/* 白色脸部 */}
+  <ellipse cx="256" cy="298" rx="118" ry="108" fill="#FFFFFF"/>
+  {/* 左眼 - 大圆 */}
+  <ellipse cx="189" cy="256" rx="38" ry="44" fill="#3D2914"/>
+  <circle cx="203" cy="238" r="18" fill="#FFFFFF"/>
+  {/* 右眼 */}
+  <ellipse cx="323" cy="256" rx="38" ry="44" fill="#3D2914"/>
+  <circle cx="337" cy="238" r="18" fill="#FFFFFF"/>
+  {/* 小鼻子 */}
+  <path d="M236 312 Q256 332 276 312 Q256 338 236 312 Z" fill="#F4C2C2"/>
+  {/* 微笑嘴巴 */}
+  <path d="M256 332 Q236 364 216 352" stroke="#5C3A1E" stroke-width="12" stroke-linecap="round" fill="none"/>
+  <path d="M256 332 Q276 364 296 352" stroke="#5C3A1E" stroke-width="12" stroke-linecap="round" fill="none"/>
+  {/* 腮红 */}
+  <ellipse cx="154" cy="324" rx="28" ry="18" fill="#F4C2C2" opacity="0.6"/>
+  <ellipse cx="358" cy="324" rx="28" ry="18" fill="#F4C2C2" opacity="0.6"/>
+  {/* 胡须 */}
+  <line x1="82" y1="304" x2="142" y2="304" stroke="#5C3A1E" stroke-width="8" stroke-linecap="round"/>
+  <line x1="82" y1="336" x2="142" y2="324" stroke="#5C3A1E" stroke-width="8" stroke-linecap="round"/>
+  <line x1="370" y1="304" x2="430" y2="304" stroke="#5C3A1E" stroke-width="8" stroke-linecap="round"/>
+  <line x1="370" y1="324" x2="430" y2="336" stroke="#5C3A1E" stroke-width="8" stroke-linecap="round"/>
+</svg>
