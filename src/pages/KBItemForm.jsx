@@ -88,9 +88,15 @@ export default function KBItemForm() {
     }
     setSaving(true)
     try {
+      // tag 单值字段：取 tags 数组第一个，如果为空设为 'other'
+      const validTags = ['quarrel', 'cold_war', 'jealousy', 'communication', 'other']
+      const firstTag = tags.length > 0 && validTags.includes(tags[0]) ? tags[0] : 'other'
+      
       const data = {
         title: title.trim(),
         tags,
+        tag: firstTag,
+        keywords: tags,  // 用 tags 作为 keywords（搜索用）
         content_male: contentMale.trim() || null,
         content_female: contentFemale.trim() || null,
         updated_at: new Date().toISOString()

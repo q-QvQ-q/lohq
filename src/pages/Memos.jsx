@@ -8,7 +8,8 @@ import { formatTime } from '../utils/dateUtils.js'
 export default function Memos() {
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { fetchWithCache, invalidateByPrefix } = useDataCache()
+  const { fetchWithCache, invalidateByPrefix, profileMap } = useDataCache()
+  const nameOf = (id, fallback = '宝宝') => id ? (profileMap[id]?.nickname || fallback) : fallback
   const [memos, setMemos] = useState([])
   const [comments, setComments] = useState({})
   const [loading, setLoading] = useState(true)
@@ -35,13 +36,13 @@ export default function Memos() {
         fetchWithCache('memos', async () => {
           const { data } = await supabase
             .from('memos')
-            .select('*, author_profile:profiles(nickname, avatar_url)')
+            .select('*')
             .order('updated_at', { ascending: false })
           return data || []
         }),
         supabase
           .from('memo_comments')
-          .select('*, author_profile:profiles(nickname)')
+          .select('*')
           .order('created_at', { ascending: true })
       ])
       
@@ -251,10 +252,10 @@ export default function Memos() {
                 <div className="flex items-center gap-2 mt-3 pt-2" style={{ borderTop: '1px solid var(--color-primary-light)' }}>
                   <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs" 
                        style={{ backgroundColor: 'var(--color-primary)', color: 'white' }}>
-                    {(memo.author_profile?.nickname || '宝')[0]}
+                    {nameOf(memo.author_id)[0]}
                   </div>
                   <span className="text-xs font-bold" style={{ color: 'var(--color-text-light)' }}>
-                    {memo.author_profile?.nickname || '宝宝'}
+                    {nameOf(memo.author_id)}
                   </span>
                   <span className="text-xs" style={{ color: 'var(--color-text-light)', opacity: 0.6 }}>
                     {formatTime(memo.updated_at)}
@@ -288,7 +289,7 @@ export default function Memos() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>
-                                  {comment.author_profile?.nickname || '宝宝'}
+                                  {nameOf(comment.author_id)}
                                 </span>
                                 <span className="text-xs" style={{ color: 'var(--color-text-light)', opacity: 0.6 }}>
                                   {formatTime(comment.created_at)}

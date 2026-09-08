@@ -18,7 +18,9 @@ const MOODS = {
 export default function Calendar() {
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { fetchWithCache, invalidateByPrefix } = useDataCache()
+  const { fetchWithCache, invalidateByPrefix, profileMap } = useDataCache()
+  
+  const nameOf = (id, fallback = '宝宝') => id ? (profileMap[id]?.nickname || fallback) : fallback
   
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(new Date())
@@ -136,7 +138,7 @@ export default function Calendar() {
         fetchWithCache(cacheKeyDiary, async () => {
           const { data } = await supabase
             .from('diaries')
-            .select('*, author_profile:profiles(nickname, gender)')
+            .select('*')
             .gte('created_at', startDate)
             .lte('created_at', endDate + 'T23:59:59')
             .order('created_at', { ascending: true })
@@ -145,7 +147,7 @@ export default function Calendar() {
         fetchWithCache(cacheKeyTodo, async () => {
           const { data } = await supabase
             .from('todos')
-            .select('*, created_by_profile:profiles(nickname)')
+            .select('*')
             .gte('due_date', startDate)
             .lte('due_date', endDate)
             .order('due_date', { ascending: true })
@@ -262,7 +264,6 @@ export default function Calendar() {
         .insert({
           mood: newDiary.mood,
           content: newDiary.content.trim(),
-          created_by: profile.id,
           author_id: profile.id,
           created_at: getDateKey(selectedDate) + 'T12:00:00'
         })
@@ -542,7 +543,7 @@ export default function Calendar() {
                       <div className="flex items-center gap-2 mb-1">
                         <span>{mood.emoji}</span>
                         <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>
-                          {d.author_profile?.nickname || '宝宝'}
+                          {nameOf(d.author_id)}
                         </span>
                         <button
                           onClick={() => deleteDiary(d.id)}
@@ -642,7 +643,7 @@ export default function Calendar() {
                       <div className="flex items-center gap-2 mb-1">
                         <span>{mood.emoji}</span>
                         <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>
-                          {d.author_profile?.nickname || '宝宝'}
+                          {nameOf(d.author_id)}
                         </span>
                         <span className="text-xs ml-auto" style={{ color: 'var(--color-text-light)' }}>
                           {dDate.getMonth() + 1}月{dDate.getDate()}日

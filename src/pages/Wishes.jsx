@@ -48,6 +48,10 @@ export default function Wishes() {
       alert('请输入愿望内容')
       return
     }
+    if (!profile?.id) {
+      alert('请先登录')
+      return
+    }
     try {
       const { error } = await supabase
         .from('wishes')

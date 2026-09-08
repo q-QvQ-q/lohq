@@ -36,7 +36,8 @@ function StarRating({ value, onChange, size = 'text-xl', readOnly = false }) {
 export default function WeeklySummaries() {
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { fetchWithCache, invalidateByPrefix } = useDataCache()
+  const { fetchWithCache, invalidateByPrefix, profileMap } = useDataCache()
+  const nameOf = (id, fallback = '宝宝') => id ? (profileMap[id]?.nickname || fallback) : fallback
   const [summaries, setSummaries] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear())
@@ -48,8 +49,8 @@ export default function WeeklySummaries() {
   const [existingSummary, setExistingSummary] = useState(null)
 
   useEffect(() => {
-    loadSummaries()
-  }, [currentYear, currentWeek])
+    if (profile?.id) loadSummaries()
+  }, [currentYear, currentWeek, profile?.id])
 
   async function loadSummaries() {
     if (!profile?.id) {
@@ -63,7 +64,7 @@ export default function WeeklySummaries() {
       const data = await fetchWithCache(cacheKey, async () => {
         const { data } = await supabase
           .from('weekly_summaries')
-          .select('*, author_profile:profiles(nickname, avatar_url)')
+          .select('*')
           .eq('year', currentYear)
           .eq('week_number', currentWeek)
         return data || []
@@ -375,7 +376,7 @@ export default function WeeklySummaries() {
                     {partnerSummary.content}
                   </p>
                   <p className="text-xs mt-2" style={{ color: 'var(--color-text-light)', opacity: 0.6 }}>
-                    {partnerSummary.author_profile?.nickname || '宝宝'} · {new Date(partnerSummary.created_at).toLocaleString('zh-CN')}
+                    {nameOf(partnerSummary.author_id)} · {new Date(partnerSummary.created_at).toLocaleString('zh-CN')}
                   </p>
                 </>
               ) : (

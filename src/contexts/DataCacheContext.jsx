@@ -18,25 +18,59 @@ export function DataCacheProvider({ children }) {
     cacheRef.current = cache
   }, [cache])
 
+  const [profileMap, setProfileMap] = useState({})
+
+  useEffect(() => {
+    if (!profile?.id) return
+    // 预加载所有相关 profiles（自己 + 伴侣），用于前端映射 nickname
+    const loadProfiles = async () => {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, nickname, avatar_url, gender')
+        const map = {}
+        if (data) data.forEach(p => { map[p.id] = p })
+        setProfileMap(map)
+      } catch (e) { /* non-critical */ }
+    }
+    loadProfiles()
+  }, [profile?.id])
+
   const invalidateByPrefix = useCallback((prefix) => {
-    setCache(prev => {
-      const next = {}
-      Object.keys(prev).forEach(key => {
-        if (!key.startsWith(prefix)) {
-          next[key] = prev[key]
-        }
-      })
-      return next
+    // Build new cache from ref (not state) to ensure synchronous consistency
+    const prev = cacheRef.current
+    const next = {}
+    Object.keys(prev).forEach(key => {
+      if (!key.startsWith(prefix)) {
+        next[key] = prev[key]
+      }
     })
+    // Update ref synchronously so fetchWithCache immediately sees the change
+    cacheRef.current = next
+    // Clear TTL timers for invalidated keys
+    Object.keys(cacheTimers.current).forEach(key => {
+      if (key.startsWith(prefix)) {
+        clearTimeout(cacheTimers.current[key])
+        delete cacheTimers.current[key]
+      }
+    })
+    // Trigger re-render
+    setCache(next)
   }, [])
 
   const invalidateCache = useCallback((key) => {
     if (!key) return
-    setCache(prev => {
-      const next = { ...prev }
-      delete next[key]
-      return next
-    })
+    // Update ref synchronously
+    const prev = cacheRef.current
+    const next = { ...prev }
+    delete next[key]
+    cacheRef.current = next
+    // Clear TTL timer
+    if (cacheTimers.current[key]) {
+      clearTimeout(cacheTimers.current[key])
+      delete cacheTimers.current[key]
+    }
+    setCache(next)
   }, [])
 
   const fetchWithCache = useCallback(async (key, fetcher, options = {}) => {
@@ -107,7 +141,7 @@ export function DataCacheProvider({ children }) {
         fetchWithCache('wallets', async () => {
           const { data } = await supabase
             .from('wallets')
-            .select('*, user:profiles(nickname, gender)')
+            .select('*')
             .order('balance', { ascending: false })
           return data || []
         })
@@ -130,7 +164,7 @@ export function DataCacheProvider({ children }) {
         fetchWithCache(`diaries_${y}_${m}`, async () => {
           const { data } = await supabase
             .from('diaries')
-            .select('*, author_profile:profiles(nickname, gender)')
+            .select('*')
             .gte('created_at', startDate)
             .lte('created_at', endDate + 'T23:59:59')
             .order('created_at', { ascending: true })
@@ -140,7 +174,7 @@ export function DataCacheProvider({ children }) {
         fetchWithCache(`todos_${y}_${m}`, async () => {
           const { data } = await supabase
             .from('todos')
-            .select('*, created_by_profile:profiles(nickname)')
+            .select('*')
             .gte('due_date', startDate)
             .lte('due_date', endDate)
             .order('due_date', { ascending: true })
@@ -150,7 +184,7 @@ export function DataCacheProvider({ children }) {
         fetchWithCache('memos', async () => {
           const { data } = await supabase
             .from('memos')
-            .select('*, author_profile:profiles(nickname, avatar_url)')
+            .select('*')
             .order('updated_at', { ascending: false })
           return data || []
         })
@@ -166,7 +200,7 @@ export function DataCacheProvider({ children }) {
         fetchWithCache('expenses_recent', async () => {
           const { data } = await supabase
             .from('expenses')
-            .select('*, payer_profile:profiles(nickname)')
+            .select('*')
             .order('expense_date', { ascending: false })
             .limit(50)
           return data || []
@@ -175,7 +209,7 @@ export function DataCacheProvider({ children }) {
         fetchWithCache('transactions_recent', async () => {
           const { data } = await supabase
             .from('wallet_transactions')
-            .select('*, from_user_profile:profiles(nickname), to_user_profile:profiles(nickname)')
+            .select('*')
             .order('transaction_date', { ascending: false })
             .limit(50)
           return data || []
@@ -185,7 +219,7 @@ export function DataCacheProvider({ children }) {
           const weekNum = getWeekNumber(now)
           const { data } = await supabase
             .from('weekly_summaries')
-            .select('*, author_profile:profiles(nickname, avatar_url)')
+            .select('*')
             .eq('year', y)
             .eq('week_number', weekNum)
           return data || []
@@ -201,7 +235,8 @@ export function DataCacheProvider({ children }) {
   const value = {
     fetchWithCache,
     invalidateCache,
-    invalidateByPrefix
+    invalidateByPrefix,
+    profileMap
   }
 
   return (

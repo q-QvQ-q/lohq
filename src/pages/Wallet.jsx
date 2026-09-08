@@ -26,8 +26,11 @@ const CATEGORY_COLORS = {
 export default function Wallet() {
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const { fetchWithCache, invalidateByPrefix } = useDataCache()
+  const { fetchWithCache, invalidateByPrefix, profileMap } = useDataCache()
   const walletsEnsuredRef = useRef(false)
+  
+  const nameOf = (id, fallback = '宝宝') => id ? (profileMap[id]?.nickname || fallback) : fallback
+  const genderOf = (id) => profileMap[id]?.gender
   
   const [wallets, setWallets] = useState([])
   const [expenses, setExpenses] = useState([])
@@ -69,14 +72,14 @@ export default function Wallet() {
         fetchWithCache('wallets', async () => {
           const { data } = await supabase
             .from('wallets')
-            .select('*, user:profiles(nickname, gender)')
+            .select('*')
             .order('balance', { ascending: false })
           return data || []
         }),
         fetchWithCache('expenses_recent', async () => {
           const { data } = await supabase
             .from('expenses')
-            .select('*, payer_profile:profiles(nickname)')
+            .select('*')
             .order('expense_date', { ascending: false })
             .limit(50)
           return data || []
@@ -84,7 +87,7 @@ export default function Wallet() {
         fetchWithCache('transactions_recent', async () => {
           const { data } = await supabase
             .from('wallet_transactions')
-            .select('*, from_user_profile:profiles(nickname), to_user_profile:profiles(nickname)')
+            .select('*')
             .order('transaction_date', { ascending: false })
             .limit(50)
           return data || []
@@ -105,14 +108,28 @@ export default function Wallet() {
   async function ensureWallets() {
     if (!profile?.id) return
     
+    // 确保当前用户有钱包
     const { data: existing } = await supabase.from('wallets').select('id').eq('user_id', profile.id)
     if (!existing || existing.length === 0) {
       await supabase.from('wallets').insert({ user_id: profile.id, balance: 0 })
     }
+    
+    // 如果有伴侣，同时确保伴侣也有钱包
+    if (profile?.partner_id) {
+      const { data: partnerWallet } = await supabase.from('wallets').select('id').eq('user_id', profile.partner_id)
+      if (!partnerWallet || partnerWallet.length === 0) {
+        await supabase.from('wallets').insert({ user_id: profile.partner_id, balance: 0 })
+      }
+    }
+    
     walletsEnsuredRef.current = true
   }
 
   async function addExpense() {
+    if (!profile?.id) {
+      alert('请先登录')
+      return
+    }
     if (!newExpense.amount || !newExpense.payer_id) {
       alert('请填写完整信息')
       return
@@ -128,7 +145,7 @@ export default function Wallet() {
         payer_id: newExpense.payer_id,
         expense_date: newExpense.expense_date,
         created_by: profile.id,
-        payer_profile: wallets.find(w => w.user_id === newExpense.payer_id)?.user?.nickname || '宝宝'
+        payer_profile: nameOf(newExpense.payer_id)
       }
       setExpenses(prev => [newRecord, ...prev])
       
@@ -174,7 +191,7 @@ export default function Wallet() {
       }
       
       // 乐观更新
-      const fromNickname = fromWallet.user?.nickname || '宝宝'
+      const fromNickname = nameOf(newFine.from_user_id)
       const newTx = {
         id: 'temp_' + Date.now(),
         type: 'fine',
@@ -185,7 +202,7 @@ export default function Wallet() {
         transaction_date: newFine.transaction_date,
         created_by: profile.id,
         from_user_profile: { nickname: fromNickname },
-        to_user_profile: { nickname: wallets.find(w => w.user_id === otherId)?.user?.nickname || '宝宝' }
+        to_user_profile: { nickname: nameOf(otherId) }
       }
       setTransactions(prev => [newTx, ...prev])
       
@@ -262,8 +279,8 @@ export default function Wallet() {
         return
       }
       
-      const toNickname = toWallet.user?.nickname || '宝宝'
-      const fromNickname = wallets.find(w => w.user_id === profile.id)?.user?.nickname || '宝宝'
+      const toNickname = nameOf(newReward.to_user_id)
+      const fromNickname = nameOf(profile.id)
       
       // 乐观更新
       const newTx = {
@@ -344,7 +361,7 @@ export default function Wallet() {
   const totalRewards = rewards.reduce((sum, t) => sum + parseFloat(t.amount), 0)
   const finesFromUser = {}
   fines.forEach(f => {
-    const name = f.from_user_profile?.nickname || '未知'
+    const name = nameOf(f.from_user_id, '未知')
     finesFromUser[name] = (finesFromUser[name] || 0) + parseFloat(f.amount)
   })
 
@@ -382,9 +399,9 @@ export default function Wallet() {
           wallets.map(wallet => (
             <div key={wallet.id} className="card text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <span className="text-xl">{wallet.user?.gender === 'female' ? '👧' : '👦'}</span>
+                <span className="text-xl">{genderOf(wallet.user_id) === 'female' ? '👧' : '👦'}</span>
                 <span className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>
-                  {wallet.user?.nickname || '宝宝'}
+                  {nameOf(wallet.user_id) || '宝宝'}
                 </span>
               </div>
               <p className="text-2xl font-bold" style={{ color: wallet.balance >= 0 ? 'var(--color-primary-dark)' : '#E74C3C' }}>
@@ -506,7 +523,7 @@ export default function Wallet() {
                             {expense.note || cat.label}
                           </p>
                           <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
-                            {expense.payer_profile?.nickname || '宝宝'} · {formatDateShort(expense.expense_date)}
+                            {nameOf(expense.payer_id)} · {formatDateShort(expense.expense_date)}
                           </p>
                         </div>
                       </div>
@@ -561,7 +578,7 @@ export default function Wallet() {
                       <span>💢</span>
                       <div>
                         <p className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>
-                          {tx.from_user_profile?.nickname} 被罚
+                          {nameOf(tx.from_user_id)} 被罚
                         </p>
                         <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
                           {tx.reason}
@@ -594,7 +611,7 @@ export default function Wallet() {
                       <span>🎁</span>
                       <div>
                         <p className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>
-                          {tx.to_user_profile?.nickname} 获得奖励
+                          {nameOf(tx.to_user_id)} 获得奖励
                         </p>
                         <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
                           {tx.reason}
@@ -696,7 +713,7 @@ export default function Wallet() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs" style={{ color: 'var(--color-text-light)' }}>
-                            {fines.filter(f => f.from_user_profile?.nickname === name).length} 次
+                            {fines.filter(f => nameOf(f.from_user_id, '未知') === name).length} 次
                           </span>
                           <span className="text-sm font-bold" style={{ color: '#E74C3C' }}>¥{amount.toFixed(2)}</span>
                         </div>
@@ -773,6 +790,8 @@ export default function Wallet() {
 }
 
 function ExpenseModal({ wallets, newExpense, setNewExpense, onClose, onSubmit }) {
+  const { profileMap } = useDataCache()
+  const nameOf = (id) => profileMap[id]?.nickname || '宝宝'
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
@@ -812,7 +831,7 @@ function ExpenseModal({ wallets, newExpense, setNewExpense, onClose, onSubmit })
           >
             <option value="">谁付的钱？</option>
             {wallets.map(w => (
-              <option key={w.id} value={w.user_id}>{w.user?.nickname}</option>
+              <option key={w.id} value={w.user_id}>{nameOf(w.user_id)}</option>
             ))}
           </select>
           <input
@@ -832,6 +851,8 @@ function ExpenseModal({ wallets, newExpense, setNewExpense, onClose, onSubmit })
 }
 
 function FineModal({ wallets, newFine, setNewFine, onClose, onSubmit }) {
+  const { profileMap } = useDataCache()
+  const nameOf = (id) => profileMap[id]?.nickname || '宝宝'
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
@@ -847,7 +868,7 @@ function FineModal({ wallets, newFine, setNewFine, onClose, onSubmit }) {
           >
             <option value="">谁犯错了？</option>
             {wallets.map(w => (
-              <option key={w.id} value={w.user_id}>{w.user?.nickname}</option>
+              <option key={w.id} value={w.user_id}>{nameOf(w.user_id)}</option>
             ))}
           </select>
           <input
@@ -885,6 +906,8 @@ function FineModal({ wallets, newFine, setNewFine, onClose, onSubmit }) {
 }
 
 function RewardModal({ wallets, newReward, setNewReward, onClose, onSubmit }) {
+  const { profileMap } = useDataCache()
+  const nameOf = (id) => profileMap[id]?.nickname || '宝宝'
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
@@ -900,7 +923,7 @@ function RewardModal({ wallets, newReward, setNewReward, onClose, onSubmit }) {
           >
             <option value="">奖励给谁？</option>
             {wallets.map(w => (
-              <option key={w.id} value={w.user_id}>{w.user?.nickname}</option>
+              <option key={w.id} value={w.user_id}>{nameOf(w.user_id)}</option>
             ))}
           </select>
           <input
