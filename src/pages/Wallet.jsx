@@ -55,7 +55,7 @@ export default function Wallet() {
   useEffect(() => {
     walletsEnsuredRef.current = false
     loadData()
-  }, [profile?.id])
+  }, [profile?.id, profile?.partner_id])
 
   async function loadData() {
     if (!profile?.id) {
@@ -73,7 +73,7 @@ export default function Wallet() {
     
     try {
       const [walletResult, expenseResult, txResult, sharedWalletResult, sharedTxResult] = await Promise.all([
-        fetchWithCache('wallets', async () => {
+        fetchWithCache(`wallets_${profile.id}_${profile.partner_id || 'solo'}`, async () => {
           const visibleUserIds = [profile.id, profile.partner_id].filter(Boolean)
           const { data } = await supabase
             .from('wallets')
@@ -129,6 +129,7 @@ export default function Wallet() {
 
     const { data: setupWallet, error: setupError } = await supabase.rpc('ensure_wallet_setup')
     if (!setupError) {
+      invalidateByPrefix('wallets')
       walletsEnsuredRef.current = true
       return setupWallet
     }
@@ -323,7 +324,15 @@ export default function Wallet() {
     if (b.user_id === profile?.id) return 1
     return 0
   })
-  const partnerWallet = individualWallets.find(wallet => wallet.user_id === profile?.partner_id)
+  const displayWallets = [profile?.id, profile?.partner_id]
+    .filter(Boolean)
+    .map(userId => individualWallets.find(wallet => wallet.user_id === userId) || {
+      id: `pending-${userId}`,
+      user_id: userId,
+      balance: 0,
+      pending: true
+    })
+  const partnerWallet = displayWallets.find(wallet => wallet.user_id === profile?.partner_id)
   const partnerName = nameOf(profile?.partner_id, '对方')
 
   function openFineModal() {
@@ -374,8 +383,8 @@ export default function Wallet() {
               <div className="h-6 w-20 mx-auto rounded" style={{ backgroundColor: 'var(--color-primary-light)' }}></div>
             </div>
           </>
-        ) : individualWallets.length > 0 ? (
-          individualWallets.map(wallet => (
+        ) : displayWallets.length > 0 ? (
+          displayWallets.map(wallet => (
             <div key={wallet.id} className="card text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <span className="text-xl">{genderOf(wallet.user_id) === 'female' ? '👧' : '👦'}</span>
@@ -386,7 +395,9 @@ export default function Wallet() {
               <p className="text-2xl font-bold" style={{ color: wallet.balance >= 0 ? 'var(--color-primary-dark)' : '#E74C3C' }}>
                 ¥{wallet.balance}
               </p>
-              <p className="text-xs mt-1" style={{ color: 'var(--color-text-light)' }}>钱包余额</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--color-text-light)' }}>
+                {wallet.pending ? '钱包初始化中' : '钱包余额'}
+              </p>
             </div>
           ))
         ) : (
@@ -791,7 +802,7 @@ export default function Wallet() {
       {/* Expense Modal */}
       {showExpenseModal && (
         <ExpenseModal
-          wallets={individualWallets}
+          wallets={displayWallets}
           sharedWallet={sharedWallet}
           newExpense={newExpense}
           setNewExpense={setNewExpense}
