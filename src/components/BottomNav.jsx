@@ -39,10 +39,10 @@ function NavItem({ to, label, catType }) {
 }
 
 const ICON_MAP = {
-  home: '/images/首页图标.PNG',
-  calendar: '/images/日历图标.PNG',
-  book: '/images/错题本图标.PNG',
-  settings: '/images/设置图标.PNG'
+  home: '/images/nav-home.png',
+  calendar: '/images/nav-calendar.png',
+  book: '/images/nav-book.png',
+  settings: '/images/nav-settings.png'
 }
 
 function CatIcon({ type, active }) {
