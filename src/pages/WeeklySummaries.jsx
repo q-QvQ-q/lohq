@@ -227,7 +227,14 @@ export default function WeeklySummaries() {
         <h1 className="page-title" style={{ marginBottom: 0 }}>
           <span>📊</span> 周总结
         </h1>
-        <div style={{ width: '50px' }}></div>
+        <button
+          type="button"
+          onClick={openCreateModal}
+          className="px-3 py-1.5 rounded-full text-xs font-bold transition-opacity hover:opacity-80"
+          style={{ backgroundColor: 'var(--color-primary)', color: 'white' }}
+        >
+          {existingSummary ? '编辑' : '+ 写总结'}
+        </button>
       </div>
 
       {/* Week Navigation */}
