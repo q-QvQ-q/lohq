@@ -178,7 +178,7 @@ function PawPrint({ size = 20, color = '#FFFFFF' }) {
 export function CuteCat({ size = 32, color, flip = false }) {
   return (
     <img
-      src="/images/装饰猫.PNG"
+      src="/images/decor-cat.png"
       alt="装饰猫"
       width={size}
       height={size}

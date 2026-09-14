@@ -33,6 +33,8 @@ export default function Wallet() {
   const genderOf = (id) => profileMap[id]?.gender
   
   const [wallets, setWallets] = useState([])
+  const [sharedWallet, setSharedWallet] = useState(null)
+  const [sharedTransactions, setSharedTransactions] = useState([])
   const [expenses, setExpenses] = useState([])
   const [transactions, setTransactions] = useState([])
   const [walletsLoading, setWalletsLoading] = useState(true)
@@ -42,12 +44,16 @@ export default function Wallet() {
   const [showExpenseModal, setShowExpenseModal] = useState(false)
   const [showFineModal, setShowFineModal] = useState(false)
   const [showRewardModal, setShowRewardModal] = useState(false)
+  const [showDepositModal, setShowDepositModal] = useState(false)
   
   const [newExpense, setNewExpense] = useState({ amount: '', category: 'food', note: '', payer_id: '', expense_date: new Date().toISOString().split('T')[0] })
   const [newFine, setNewFine] = useState({ amount: '', reason: '', from_user_id: '', transaction_date: new Date().toISOString().split('T')[0] })
   const [newReward, setNewReward] = useState({ amount: '', reason: '', to_user_id: '', transaction_date: new Date().toISOString().split('T')[0] })
+  const [newDeposit, setNewDeposit] = useState({ amount: '', note: '', transaction_date: new Date().toISOString().split('T')[0] })
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
+    walletsEnsuredRef.current = false
     loadData()
   }, [profile?.id])
 
@@ -59,20 +65,20 @@ export default function Wallet() {
     }
     
     // 1. ensureWallets 优先执行（竞态修复：确保钱包存在再加载）
-    if (!walletsEnsuredRef.current) {
-      await ensureWallets()
-    }
+    const ensuredSharedWallet = !walletsEnsuredRef.current ? await ensureWallets() : null
     
     // 2. 并发加载所有数据
     setWalletsLoading(true)
     setDataLoading(true)
     
     try {
-      const [walletResult, expenseResult, txResult] = await Promise.all([
+      const [walletResult, expenseResult, txResult, sharedWalletResult, sharedTxResult] = await Promise.all([
         fetchWithCache('wallets', async () => {
+          const visibleUserIds = [profile.id, profile.partner_id].filter(Boolean)
           const { data } = await supabase
             .from('wallets')
             .select('*')
+            .in('user_id', visibleUserIds)
             .order('balance', { ascending: false })
           return data || []
         }),
@@ -91,12 +97,25 @@ export default function Wallet() {
             .order('transaction_date', { ascending: false })
             .limit(50)
           return data || []
-        }, { ttl: 30000 })
+        }, { ttl: 30000 }),
+        supabase
+          .from('couple_wallets')
+          .select('*')
+          .order('updated_at', { ascending: false })
+          .limit(1),
+        supabase
+          .from('shared_wallet_transactions')
+          .select('*')
+          .order('transaction_date', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(20)
       ])
       
       setWallets(walletResult)
       setExpenses(expenseResult)
       setTransactions(txResult)
+      setSharedWallet(sharedWalletResult.data?.[0] || ensuredSharedWallet || null)
+      setSharedTransactions(sharedTxResult.data || [])
     } catch (err) {
       console.error('加载数据失败:', err)
     } finally {
@@ -107,6 +126,16 @@ export default function Wallet() {
 
   async function ensureWallets() {
     if (!profile?.id) return
+
+    const { data: setupWallet, error: setupError } = await supabase.rpc('ensure_wallet_setup')
+    if (!setupError) {
+      walletsEnsuredRef.current = true
+      return setupWallet
+    }
+
+    // Keep the existing two personal wallets usable until the new migration
+    // has been run in Supabase.
+    console.warn('共同账本尚未初始化:', setupError.message)
     
     // 确保当前用户有钱包
     const { data: existing } = await supabase.from('wallets').select('id').eq('user_id', profile.id)
@@ -123,6 +152,7 @@ export default function Wallet() {
     }
     
     walletsEnsuredRef.current = true
+    return null
   }
 
   async function addExpense() {
@@ -130,211 +160,134 @@ export default function Wallet() {
       alert('请先登录')
       return
     }
-    if (!newExpense.amount || !newExpense.payer_id) {
+    const expenseAmount = parseFloat(newExpense.amount)
+    if (!Number.isFinite(expenseAmount) || expenseAmount <= 0 || !newExpense.payer_id) {
       alert('请填写完整信息')
       return
     }
+    if (submitting) return
+    setSubmitting(true)
     try {
-      // 乐观更新：先在本地插入
-      const tempId = 'temp_' + Date.now()
-      const newRecord = {
-        id: tempId,
-        amount: parseFloat(newExpense.amount),
-        category: newExpense.category,
-        note: newExpense.note || null,
-        payer_id: newExpense.payer_id,
-        expense_date: newExpense.expense_date,
-        created_by: profile.id,
-        payer_profile: nameOf(newExpense.payer_id)
-      }
-      setExpenses(prev => [newRecord, ...prev])
-      
-      const { error } = await supabase
-        .from('expenses')
-        .insert({
-          amount: parseFloat(newExpense.amount),
-          category: newExpense.category,
-          note: newExpense.note || null,
-          payer_id: newExpense.payer_id,
-          expense_date: newExpense.expense_date,
-          created_by: profile.id
+      if (newExpense.payer_id === 'shared') {
+        if (!sharedWallet?.id) throw new Error('共同账本尚未初始化')
+        const { error } = await supabase.rpc('adjust_shared_wallet', {
+          p_wallet_id: sharedWallet.id,
+          p_type: 'expense',
+          p_amount: expenseAmount,
+          p_note: newExpense.note || null,
+          p_transaction_date: newExpense.expense_date,
+          p_category: newExpense.category
         })
-      if (error) throw error
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('expenses')
+          .insert({
+            amount: expenseAmount,
+            category: newExpense.category,
+            note: newExpense.note || null,
+            payer_id: newExpense.payer_id,
+            expense_date: newExpense.expense_date,
+            created_by: profile.id
+          })
+        if (error) throw error
+      }
       
       // 后台刷新，不阻塞UI
       invalidateByPrefix('expenses')
       invalidateByPrefix('wallets')
-      loadData()
+      await loadData()
       
       setNewExpense({ amount: '', category: 'food', note: '', payer_id: '', expense_date: new Date().toISOString().split('T')[0] })
       setShowExpenseModal(false)
     } catch (err) {
-      // 回滚乐观更新
-      setExpenses(prev => prev.filter(e => !e.id.startsWith('temp_')))
       alert('添加失败: ' + err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function applyPartnerTransaction(type) {
+    const form = type === 'fine' ? newFine : newReward
+    const amount = parseFloat(form.amount)
+    if (!profile?.partner_id) {
+      alert('请先在设置中绑定伴侣')
+      return
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert('请输入正确的金额')
+      return
+    }
+    if (submitting) return
+
+    setSubmitting(true)
+    try {
+      const { error } = await supabase.rpc('apply_partner_wallet_transaction', {
+        p_type: type,
+        p_amount: amount,
+        p_reason: form.reason || null,
+        p_transaction_date: form.transaction_date
+      })
+      if (error) throw error
+
+      invalidateByPrefix('wallets')
+      invalidateByPrefix('transactions')
+      await loadData()
+
+      if (type === 'fine') {
+        setNewFine({ amount: '', reason: '', from_user_id: profile.partner_id, transaction_date: new Date().toISOString().split('T')[0] })
+        setShowFineModal(false)
+      } else {
+        setNewReward({ amount: '', reason: '', to_user_id: profile.partner_id, transaction_date: new Date().toISOString().split('T')[0] })
+        setShowRewardModal(false)
+      }
+    } catch (err) {
+      alert('操作失败: ' + err.message)
+    } finally {
+      setSubmitting(false)
     }
   }
 
   async function addFine() {
-    if (!newFine.amount || !newFine.from_user_id) {
-      alert('请填写完整信息')
-      return
-    }
-    try {
-      const fineAmount = parseFloat(newFine.amount)
-      const otherId = wallets.find(w => w.user_id !== newFine.from_user_id)?.user_id
-      const fromWallet = wallets.find(w => w.user_id === newFine.from_user_id)
-      
-      if (!fromWallet) {
-        alert('找不到钱包')
-        return
-      }
-      
-      // 乐观更新
-      const fromNickname = nameOf(newFine.from_user_id)
-      const newTx = {
-        id: 'temp_' + Date.now(),
-        type: 'fine',
-        from_user_id: newFine.from_user_id,
-        to_user_id: otherId,
-        amount: fineAmount,
-        reason: newFine.reason || '犯错罚款',
-        transaction_date: newFine.transaction_date,
-        created_by: profile.id,
-        from_user_profile: { nickname: fromNickname },
-        to_user_profile: { nickname: nameOf(otherId) }
-      }
-      setTransactions(prev => [newTx, ...prev])
-      
-      // 乐观更新钱包余额
-      setWallets(prev => prev.map(w => {
-        if (w.user_id === newFine.from_user_id) {
-          return { ...w, balance: parseFloat(w.balance) - fineAmount }
-        }
-        if (w.user_id === otherId) {
-          return { ...w, balance: parseFloat(w.balance) + fineAmount }
-        }
-        return w
-      }))
-      
-      const { error: txError } = await supabase
-        .from('wallet_transactions')
-        .insert({
-          type: 'fine',
-          from_user_id: newFine.from_user_id,
-          to_user_id: otherId,
-          amount: fineAmount,
-          reason: newFine.reason || '犯错罚款',
-          transaction_date: newFine.transaction_date,
-          created_by: profile.id
-        })
-      if (txError) throw txError
-      
-      // 更新犯错方钱包
-      const newFromBalance = parseFloat(fromWallet.balance) - fineAmount
-      const { error: fromError } = await supabase
-        .from('wallets')
-        .update({ balance: newFromBalance, updated_at: new Date().toISOString() })
-        .eq('user_id', newFine.from_user_id)
-      if (fromError) throw fromError
-      
-      if (otherId) {
-        const toWallet = wallets.find(w => w.user_id === otherId)
-        const newToBalance = parseFloat(toWallet?.balance || 0) + fineAmount
-        const { error: toError } = await supabase
-          .from('wallets')
-          .update({ balance: newToBalance, updated_at: new Date().toISOString() })
-          .eq('user_id', otherId)
-        if (toError) throw toError
-      }
-      
-      // 后台刷新
-      invalidateByPrefix('wallets')
-      invalidateByPrefix('transactions')
-      loadData()
-      
-      setNewFine({ amount: '', reason: '', from_user_id: '', transaction_date: new Date().toISOString().split('T')[0] })
-      setShowFineModal(false)
-    } catch (err) {
-      // 回滚乐观更新
-      setTransactions(prev => prev.filter(t => !t.id.startsWith('temp_')))
-      invalidateByPrefix('wallets')
-      invalidateByPrefix('transactions')
-      loadData()
-      alert('操作失败: ' + err.message)
-    }
+    await applyPartnerTransaction('fine')
   }
 
   async function addReward() {
-    if (!newReward.amount || !newReward.to_user_id) {
-      alert('请填写完整信息')
+    await applyPartnerTransaction('reward')
+  }
+
+  async function addSharedDeposit() {
+    const amount = parseFloat(newDeposit.amount)
+    if (!sharedWallet?.id) {
+      alert('请先绑定伴侣并初始化共同账本')
       return
     }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert('请输入正确的金额')
+      return
+    }
+    if (submitting) return
+
+    setSubmitting(true)
     try {
-      const rewardAmount = parseFloat(newReward.amount)
-      const toWallet = wallets.find(w => w.user_id === newReward.to_user_id)
-      
-      if (!toWallet) {
-        alert('找不到钱包')
-        return
-      }
-      
-      const toNickname = nameOf(newReward.to_user_id)
-      const fromNickname = nameOf(profile.id)
-      
-      // 乐观更新
-      const newTx = {
-        id: 'temp_' + Date.now(),
-        type: 'reward',
-        from_user_id: profile.id,
-        to_user_id: newReward.to_user_id,
-        amount: rewardAmount,
-        reason: newReward.reason || '表现奖励',
-        transaction_date: newReward.transaction_date,
-        created_by: profile.id,
-        from_user_profile: { nickname: fromNickname },
-        to_user_profile: { nickname: toNickname }
-      }
-      setTransactions(prev => [newTx, ...prev])
-      setWallets(prev => prev.map(w => 
-        w.user_id === newReward.to_user_id 
-          ? { ...w, balance: parseFloat(w.balance) + rewardAmount }
-          : w
-      ))
-      
-      const { error: txError } = await supabase
-        .from('wallet_transactions')
-        .insert({
-          type: 'reward',
-          from_user_id: profile.id,
-          to_user_id: newReward.to_user_id,
-          amount: rewardAmount,
-          reason: newReward.reason || '表现奖励',
-          transaction_date: newReward.transaction_date,
-          created_by: profile.id
-        })
-      if (txError) throw txError
-      
-      const newBalance = parseFloat(toWallet.balance) + rewardAmount
-      const { error: toError } = await supabase
-        .from('wallets')
-        .update({ balance: newBalance, updated_at: new Date().toISOString() })
-        .eq('user_id', newReward.to_user_id)
-      if (toError) throw toError
-      
-      // 后台刷新
-      invalidateByPrefix('wallets')
-      invalidateByPrefix('transactions')
-      loadData()
-      
-      setNewReward({ amount: '', reason: '', to_user_id: '', transaction_date: new Date().toISOString().split('T')[0] })
-      setShowRewardModal(false)
+      const { error } = await supabase.rpc('adjust_shared_wallet', {
+        p_wallet_id: sharedWallet.id,
+        p_type: 'deposit',
+        p_amount: amount,
+        p_note: newDeposit.note || null,
+        p_transaction_date: newDeposit.transaction_date,
+        p_category: null
+      })
+      if (error) throw error
+
+      invalidateByPrefix('expenses')
+      await loadData()
+      setNewDeposit({ amount: '', note: '', transaction_date: new Date().toISOString().split('T')[0] })
+      setShowDepositModal(false)
     } catch (err) {
-      setTransactions(prev => prev.filter(t => !t.id.startsWith('temp_')))
-      invalidateByPrefix('wallets')
-      invalidateByPrefix('transactions')
-      loadData()
-      alert('操作失败: ' + err.message)
+      alert('存入失败: ' + err.message)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -365,6 +318,32 @@ export default function Wallet() {
     finesFromUser[name] = (finesFromUser[name] || 0) + parseFloat(f.amount)
   })
 
+  const individualWallets = [...wallets].sort((a, b) => {
+    if (a.user_id === profile?.id) return -1
+    if (b.user_id === profile?.id) return 1
+    return 0
+  })
+  const partnerWallet = individualWallets.find(wallet => wallet.user_id === profile?.partner_id)
+  const partnerName = nameOf(profile?.partner_id, '对方')
+
+  function openFineModal() {
+    if (!profile?.partner_id) {
+      alert('请先在设置中绑定伴侣')
+      return
+    }
+    setNewFine(current => ({ ...current, from_user_id: profile.partner_id }))
+    setShowFineModal(true)
+  }
+
+  function openRewardModal() {
+    if (!profile?.partner_id) {
+      alert('请先在设置中绑定伴侣')
+      return
+    }
+    setNewReward(current => ({ ...current, to_user_id: profile.partner_id }))
+    setShowRewardModal(true)
+  }
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -382,7 +361,7 @@ export default function Wallet() {
         <div style={{ width: '50px' }}></div>
       </div>
 
-      {/* Wallet Cards - 双人余额（单独加载状态） */}
+      {/* Wallet Cards - 我的、对方、共同 */}
       <div className="grid grid-cols-2 gap-3">
         {walletsLoading ? (
           <>
@@ -395,13 +374,13 @@ export default function Wallet() {
               <div className="h-6 w-20 mx-auto rounded" style={{ backgroundColor: 'var(--color-primary-light)' }}></div>
             </div>
           </>
-        ) : wallets.length > 0 ? (
-          wallets.map(wallet => (
+        ) : individualWallets.length > 0 ? (
+          individualWallets.map(wallet => (
             <div key={wallet.id} className="card text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <span className="text-xl">{genderOf(wallet.user_id) === 'female' ? '👧' : '👦'}</span>
                 <span className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>
-                  {nameOf(wallet.user_id) || '宝宝'}
+                  {wallet.user_id === profile?.id ? '我的' : `${nameOf(wallet.user_id)}的`}
                 </span>
               </div>
               <p className="text-2xl font-bold" style={{ color: wallet.balance >= 0 ? 'var(--color-primary-dark)' : '#E74C3C' }}>
@@ -421,6 +400,39 @@ export default function Wallet() {
               <p className="text-2xl font-bold mt-1" style={{ color: 'var(--color-primary-dark)' }}>¥0</p>
             </div>
           </>
+        )}
+        {!walletsLoading && profile?.partner_id && (
+          <div className="card text-center col-span-2" style={{ borderColor: 'var(--color-primary)', borderWidth: '1px' }}>
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <span className="text-xl">🏦</span>
+              <span className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>我们共同的</span>
+            </div>
+            <p className="text-3xl font-bold" style={{ color: 'var(--color-primary-dark)' }}>
+              ¥{Number(sharedWallet?.balance || 0).toFixed(2)}
+            </p>
+            <p className="text-xs mt-1 mb-3" style={{ color: 'var(--color-text-light)' }}>双方都可以存入，也可以用于共同支出</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setShowDepositModal(true)}
+                className="btn-primary text-xs px-3 py-2"
+                disabled={!sharedWallet}
+              >
+                + 存入
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setNewExpense(current => ({ ...current, payer_id: 'shared' }))
+                  setShowExpenseModal(true)
+                }}
+                className="btn-secondary text-xs px-3 py-2"
+                disabled={!sharedWallet}
+              >
+                - 共同支出
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
@@ -484,6 +496,29 @@ export default function Wallet() {
               </span>
             </div>
           </div>
+
+          {sharedTransactions.length > 0 && (
+            <div className="card mb-3">
+              <h3 className="font-bold mb-2 text-sm" style={{ color: 'var(--color-text)' }}>🏦 共同账本最近流水</h3>
+              <div className="space-y-2">
+                {sharedTransactions.slice(0, 6).map(transaction => (
+                  <div key={transaction.id} className="flex items-center justify-between text-xs">
+                    <div>
+                      <span className="font-bold" style={{ color: 'var(--color-text)' }}>
+                        {transaction.type === 'deposit' ? `${nameOf(transaction.contributor_id)} 存入` : (transaction.note || CATEGORIES[transaction.category]?.label || '共同支出')}
+                      </span>
+                      <span className="ml-2" style={{ color: 'var(--color-text-light)' }}>
+                        {formatDateShort(transaction.transaction_date)}
+                      </span>
+                    </div>
+                    <span className="font-bold" style={{ color: transaction.type === 'deposit' ? '#4CAF50' : '#E74C3C' }}>
+                      {transaction.type === 'deposit' ? '+' : '-'}¥{Number(transaction.amount).toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
           {/* Expenses List */}
           <h3 className="font-bold mb-2 text-sm" style={{ color: 'var(--color-text)' }}>支出记录</h3>
@@ -523,7 +558,7 @@ export default function Wallet() {
                             {expense.note || cat.label}
                           </p>
                           <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
-                            {nameOf(expense.payer_id)} · {formatDateShort(expense.expense_date)}
+                            {expense.shared_wallet_id ? '共同账户' : nameOf(expense.payer_id)} · {formatDateShort(expense.expense_date)}
                           </p>
                         </div>
                       </div>
@@ -545,20 +580,20 @@ export default function Wallet() {
           {/* Action Buttons */}
           <div className="grid grid-cols-2 gap-2 mb-3">
             <button
-              onClick={() => setShowFineModal(true)}
+              onClick={openFineModal}
               className="card text-center py-3 hover:shadow-md transition-shadow"
               style={{ borderColor: '#E74C3C', borderWidth: '1px' }}
             >
               <span className="text-2xl block">💢</span>
-              <span className="text-xs font-bold" style={{ color: '#E74C3C' }}>记罚款</span>
+              <span className="text-xs font-bold" style={{ color: '#E74C3C' }}>记对方罚款</span>
             </button>
             <button
-              onClick={() => setShowRewardModal(true)}
+              onClick={openRewardModal}
               className="card text-center py-3 hover:shadow-md transition-shadow"
               style={{ borderColor: 'var(--color-primary)', borderWidth: '1px' }}
             >
               <span className="text-2xl block">🎁</span>
-              <span className="text-xs font-bold" style={{ color: 'var(--color-primary-dark)' }}>给奖励</span>
+              <span className="text-xs font-bold" style={{ color: 'var(--color-primary-dark)' }}>奖励对方</span>
             </button>
           </div>
 
@@ -756,40 +791,56 @@ export default function Wallet() {
       {/* Expense Modal */}
       {showExpenseModal && (
         <ExpenseModal
-          wallets={wallets}
+          wallets={individualWallets}
+          sharedWallet={sharedWallet}
           newExpense={newExpense}
           setNewExpense={setNewExpense}
           onClose={() => setShowExpenseModal(false)}
           onSubmit={addExpense}
+          submitting={submitting}
         />
       )}
 
       {/* Fine Modal */}
       {showFineModal && (
         <FineModal
-          wallets={wallets}
+          partnerName={partnerName}
+          partnerBalance={partnerWallet?.balance}
           newFine={newFine}
           setNewFine={setNewFine}
           onClose={() => setShowFineModal(false)}
           onSubmit={addFine}
+          submitting={submitting}
         />
       )}
 
       {/* Reward Modal */}
       {showRewardModal && (
         <RewardModal
-          wallets={wallets}
+          partnerName={partnerName}
+          partnerBalance={partnerWallet?.balance}
           newReward={newReward}
           setNewReward={setNewReward}
           onClose={() => setShowRewardModal(false)}
           onSubmit={addReward}
+          submitting={submitting}
+        />
+      )}
+
+      {showDepositModal && (
+        <DepositModal
+          newDeposit={newDeposit}
+          setNewDeposit={setNewDeposit}
+          onClose={() => setShowDepositModal(false)}
+          onSubmit={addSharedDeposit}
+          submitting={submitting}
         />
       )}
     </div>
   )
 }
 
-function ExpenseModal({ wallets, newExpense, setNewExpense, onClose, onSubmit }) {
+function ExpenseModal({ wallets, sharedWallet, newExpense, setNewExpense, onClose, onSubmit, submitting }) {
   const { profileMap } = useDataCache()
   const nameOf = (id) => profileMap[id]?.nickname || '宝宝'
   return (
@@ -833,6 +884,7 @@ function ExpenseModal({ wallets, newExpense, setNewExpense, onClose, onSubmit })
             {wallets.map(w => (
               <option key={w.id} value={w.user_id}>{nameOf(w.user_id)}</option>
             ))}
+            {sharedWallet && <option value="shared">🏦 我们共同的</option>}
           </select>
           <input
             type="date"
@@ -843,16 +895,16 @@ function ExpenseModal({ wallets, newExpense, setNewExpense, onClose, onSubmit })
         </div>
         <div className="flex gap-2 mt-4">
           <button onClick={onClose} className="btn-secondary flex-1">取消</button>
-          <button onClick={onSubmit} className="btn-primary flex-1">保存</button>
+          <button onClick={onSubmit} className="btn-primary flex-1" disabled={submitting}>
+            {submitting ? '保存中...' : '保存'}
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
-function FineModal({ wallets, newFine, setNewFine, onClose, onSubmit }) {
-  const { profileMap } = useDataCache()
-  const nameOf = (id) => profileMap[id]?.nickname || '宝宝'
+function FineModal({ partnerName, partnerBalance, newFine, setNewFine, onClose, onSubmit, submitting }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
@@ -861,16 +913,9 @@ function FineModal({ wallets, newFine, setNewFine, onClose, onSubmit }) {
           💢 记一笔罚款
         </h3>
         <div className="space-y-3">
-          <select
-            value={newFine.from_user_id}
-            onChange={(e) => setNewFine({ ...newFine, from_user_id: e.target.value })}
-            className="input-field"
-          >
-            <option value="">谁犯错了？</option>
-            {wallets.map(w => (
-              <option key={w.id} value={w.user_id}>{nameOf(w.user_id)}</option>
-            ))}
-          </select>
+          <div className="p-3 rounded-xl text-sm" style={{ backgroundColor: 'rgba(231, 76, 60, 0.08)', color: 'var(--color-text)' }}>
+            将记录到 <strong>{partnerName}</strong> 的账本（当前 ¥{Number(partnerBalance || 0).toFixed(2)}）
+          </div>
           <input
             type="number"
             value={newFine.amount}
@@ -893,21 +938,21 @@ function FineModal({ wallets, newFine, setNewFine, onClose, onSubmit }) {
             className="input-field"
           />
           <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
-            💡 罚款将自动从犯错方钱包扣除，加到对方钱包
+            💡 罚款只从对方账本扣除，不会转入你的账本
           </p>
         </div>
         <div className="flex gap-2 mt-4">
           <button onClick={onClose} className="btn-secondary flex-1">取消</button>
-          <button onClick={onSubmit} className="btn-primary flex-1">执行</button>
+          <button onClick={onSubmit} className="btn-primary flex-1" disabled={submitting}>
+            {submitting ? '执行中...' : '执行'}
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
-function RewardModal({ wallets, newReward, setNewReward, onClose, onSubmit }) {
-  const { profileMap } = useDataCache()
-  const nameOf = (id) => profileMap[id]?.nickname || '宝宝'
+function RewardModal({ partnerName, partnerBalance, newReward, setNewReward, onClose, onSubmit, submitting }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
@@ -916,16 +961,9 @@ function RewardModal({ wallets, newReward, setNewReward, onClose, onSubmit }) {
           🎁 给一笔奖励
         </h3>
         <div className="space-y-3">
-          <select
-            value={newReward.to_user_id}
-            onChange={(e) => setNewReward({ ...newReward, to_user_id: e.target.value })}
-            className="input-field"
-          >
-            <option value="">奖励给谁？</option>
-            {wallets.map(w => (
-              <option key={w.id} value={w.user_id}>{nameOf(w.user_id)}</option>
-            ))}
-          </select>
+          <div className="p-3 rounded-xl text-sm" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-text)' }}>
+            将记录到 <strong>{partnerName}</strong> 的账本（当前 ¥{Number(partnerBalance || 0).toFixed(2)}）
+          </div>
           <input
             type="number"
             value={newReward.amount}
@@ -953,7 +991,54 @@ function RewardModal({ wallets, newReward, setNewReward, onClose, onSubmit }) {
         </div>
         <div className="flex gap-2 mt-4">
           <button onClick={onClose} className="btn-secondary flex-1">取消</button>
-          <button onClick={onSubmit} className="btn-primary flex-1">执行</button>
+          <button onClick={onSubmit} className="btn-primary flex-1" disabled={submitting}>
+            {submitting ? '执行中...' : '执行'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DepositModal({ newDeposit, setNewDeposit, onClose, onSubmit, submitting }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+         style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+      <div className="card w-full max-w-md">
+        <h3 className="font-bold mb-4" style={{ color: 'var(--color-text)' }}>🏦 存入共同账户</h3>
+        <div className="space-y-3">
+          <input
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={newDeposit.amount}
+            onChange={(e) => setNewDeposit({ ...newDeposit, amount: e.target.value })}
+            placeholder="存入金额"
+            className="input-field"
+            autoFocus
+          />
+          <input
+            type="text"
+            value={newDeposit.note}
+            onChange={(e) => setNewDeposit({ ...newDeposit, note: e.target.value })}
+            placeholder="备注（可选）"
+            className="input-field"
+          />
+          <input
+            type="date"
+            value={newDeposit.transaction_date}
+            onChange={(e) => setNewDeposit({ ...newDeposit, transaction_date: e.target.value })}
+            className="input-field"
+          />
+          <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
+            💡 双方都能看到这笔存入和更新后的共同余额
+          </p>
+        </div>
+        <div className="flex gap-2 mt-4">
+          <button onClick={onClose} className="btn-secondary flex-1">取消</button>
+          <button onClick={onSubmit} className="btn-primary flex-1" disabled={submitting}>
+            {submitting ? '存入中...' : '确认存入'}
+          </button>
         </div>
       </div>
     </div>

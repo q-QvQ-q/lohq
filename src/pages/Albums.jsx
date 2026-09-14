@@ -6,6 +6,27 @@ import { useDataCache } from '../contexts/DataCacheContext.jsx'
 import { formatTime } from '../utils/dateUtils.js'
 
 const SIGNED_URL_TTL = 604800 // 7天有效期，减少重新生成次数
+const PHOTO_PAGE_SIZE = 60
+
+function getStoragePath(photo) {
+  if (photo?.file_path && !photo.file_path.startsWith('http')) return photo.file_path
+  if (!photo?.url) return ''
+  if (!photo.url.startsWith('http')) return photo.url
+
+  const markers = [
+    '/storage/v1/object/sign/photos/',
+    '/storage/v1/object/public/photos/'
+  ]
+  const marker = markers.find(item => photo.url.includes(item))
+  if (!marker) return ''
+
+  const encodedPath = photo.url.split(marker)[1]?.split('?')[0] || ''
+  try {
+    return decodeURIComponent(encodedPath)
+  } catch {
+    return encodedPath
+  }
+}
 
 export default function Albums() {
   const navigate = useNavigate()
@@ -18,6 +39,9 @@ export default function Albums() {
   const [showPhotoModal, setShowPhotoModal] = useState(false)
   const [currentAlbum, setCurrentAlbum] = useState(null)
   const [photos, setPhotos] = useState([])
+  const [photoLimit, setPhotoLimit] = useState(PHOTO_PAGE_SIZE)
+  const [photoTotal, setPhotoTotal] = useState(0)
+  const [photoLoadError, setPhotoLoadError] = useState('')
   const [newAlbumName, setNewAlbumName] = useState('')
   const [viewerUrl, setViewerUrl] = useState(null)
   const [viewerTime, setViewerTime] = useState(null)
@@ -47,7 +71,8 @@ export default function Albums() {
         }),
         supabase
           .from('photos')
-          .select('album_id')
+          .select('album_id, file_path, url, uploaded_at')
+          .order('uploaded_at', { ascending: false })
       ])
       
       if (!albumsData || albumsData.length === 0) {
@@ -56,13 +81,33 @@ export default function Albums() {
       }
       
       const countMap = {}
+      const latestPhotoMap = {}
       ;(photosResult.data || []).forEach(p => {
         countMap[p.album_id] = (countMap[p.album_id] || 0) + 1
+        if (!latestPhotoMap[p.album_id]) latestPhotoMap[p.album_id] = p
       })
+
+      const coverMap = {}
+      const coversToSign = albumsData
+        .map(album => ({ albumId: album.id, path: getStoragePath(latestPhotoMap[album.id]) }))
+        .filter(item => item.path)
+
+      if (coversToSign.length > 0) {
+        const { data: signedCovers } = await supabase.storage
+          .from('photos')
+          .createSignedUrls(coversToSign.map(item => item.path), SIGNED_URL_TTL, {
+            transform: { width: 480, height: 480, resize: 'cover', quality: 70 }
+          })
+        ;(signedCovers || []).forEach((item, index) => {
+          coverMap[coversToSign[index]?.albumId] = item.signedUrl || ''
+        })
+      }
       
       const albumsWithCount = albumsData.map(album => ({
         ...album,
-        photo_count: countMap[album.id] || 0
+        photo_count: countMap[album.id] || 0,
+        cover_url: coverMap[album.id]
+          || (album.cover_url?.startsWith('http') && !album.cover_url.includes('/storage/v1/object/sign/') ? album.cover_url : '')
       }))
       
       setAlbums(albumsWithCount)
@@ -74,15 +119,17 @@ export default function Albums() {
     }
   }
 
-  async function loadPhotos(albumId) {
+  async function loadPhotos(albumId, limit = photoLimit) {
+    setPhotoLoadError('')
     try {
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from('photos')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('album_id', albumId)
         .order('uploaded_at', { ascending: false })
-        .limit(60)
+        .limit(limit)
       if (error) throw error
+      setPhotoTotal(count || 0)
       
       if (!data || data.length === 0) {
         setPhotos([])
@@ -94,18 +141,20 @@ export default function Albums() {
       const needSign = []
       
       data.forEach(photo => {
-        const cached = photo.file_path ? signedUrlCache.current.get(photo.file_path) : null
+        const stablePath = getStoragePath(photo)
+        const normalizedPhoto = stablePath ? { ...photo, file_path: stablePath } : photo
+        const cached = stablePath ? signedUrlCache.current.get(stablePath) : null
 
         // Signed URLs expire. Only reuse one whose expiry is known in this session;
         // persisted signed URLs from an earlier session must be regenerated.
-        if (photo.file_path) {
+        if (stablePath) {
           if (cached && cached.expireAt > Date.now()) {
-            hasValidUrl.push({ photo, cachedUrl: cached.url })
+            hasValidUrl.push({ photo: normalizedPhoto, cachedUrl: cached.url })
           } else {
-            needSign.push(photo)
+            needSign.push(normalizedPhoto)
           }
         } else if (photo.url?.startsWith('http')) {
-          // Compatibility with legacy records that only contain a public URL.
+          // Compatibility with genuinely external image URLs.
           hasValidUrl.push({ photo, cachedUrl: photo.url })
         }
       })
@@ -139,8 +188,7 @@ export default function Albums() {
         
         if (signedUrlsError) {
           console.warn('批量签名URL生成失败:', signedUrlsError)
-          // 生成失败也显示，用空URL让浏览器显示占位
-          const failedPhotos = needSign.map(p => ({ ...p, signed_url: '' }))
+          const failedPhotos = needSign.map(p => ({ ...p, signed_url: '', load_error: true }))
           setPhotos(prev => {
             const map = {}
             failedPhotos.forEach(p => { map[p.id] = p })
@@ -170,7 +218,7 @@ export default function Albums() {
       }
     } catch (err) {
       console.error('加载照片失败:', err)
-      alert('加载失败: ' + err.message)
+      setPhotoLoadError(err.message || '照片加载失败')
     }
   }
 
@@ -346,7 +394,15 @@ export default function Albums() {
   function openAlbum(album) {
     setCurrentAlbum(album)
     setShowPhotoModal(true)
-    loadPhotos(album.id)
+    setPhotoLimit(PHOTO_PAGE_SIZE)
+    loadPhotos(album.id, PHOTO_PAGE_SIZE)
+  }
+
+  function loadMorePhotos() {
+    if (!currentAlbum) return
+    const nextLimit = photoLimit + PHOTO_PAGE_SIZE
+    setPhotoLimit(nextLimit)
+    loadPhotos(currentAlbum.id, nextLimit)
   }
 
   function openRenameModal(album) {
@@ -467,7 +523,7 @@ export default function Albums() {
         <>
           <div className="flex items-center justify-between">
             <p className="text-sm" style={{ color: 'var(--color-text-light)' }}>
-              共 {photos.length} 张照片
+              共 {photoTotal} 张照片
             </p>
             <label className="btn-primary cursor-pointer">
               <input
@@ -481,7 +537,16 @@ export default function Albums() {
             </label>
           </div>
 
-          {photos.length === 0 ? (
+          {photoLoadError && (
+            <div className="card text-center py-4">
+              <p className="text-sm mb-2" style={{ color: '#E74C3C' }}>照片加载失败：{photoLoadError}</p>
+              <button type="button" className="btn-secondary text-xs" onClick={() => loadPhotos(currentAlbum.id, photoLimit)}>
+                重新加载
+              </button>
+            </div>
+          )}
+
+          {!photoLoadError && photos.length === 0 ? (
             <div className="card text-center py-12">
               <span className="text-4xl block mb-2">📷</span>
               <p style={{ color: 'var(--color-text-light)' }}>还没有照片</p>
@@ -496,6 +561,16 @@ export default function Albums() {
                   {photo.signed_url === '__loading__' ? (
                     <div className="w-full aspect-square rounded-lg animate-pulse" 
                          style={{ backgroundColor: 'var(--color-primary-light)' }} />
+                  ) : !photo.signed_url ? (
+                    <button
+                      type="button"
+                      onClick={() => loadPhotos(currentAlbum.id, photoLimit)}
+                      className="w-full aspect-square rounded-lg flex flex-col items-center justify-center text-xs"
+                      style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-text-light)' }}
+                    >
+                      <span className="text-xl mb-1">↻</span>
+                      加载失败，点此重试
+                    </button>
                   ) : (
                     <img
                     src={photo.signed_url}
@@ -531,6 +606,11 @@ export default function Albums() {
                 </div>
               ))}
             </div>
+          )}
+          {photos.length < photoTotal && (
+            <button type="button" onClick={loadMorePhotos} className="w-full btn-secondary text-sm mt-3">
+              加载更多（还有 {photoTotal - photos.length} 张）
+            </button>
           )}
         </>
       )}
