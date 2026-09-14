@@ -5,6 +5,26 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import { useDataCache } from '../contexts/DataCacheContext.jsx'
 import { formatTime } from '../utils/dateUtils.js'
 
+function RatingStars({ value = 0, onChange, readOnly = false }) {
+  return (
+    <div className="flex items-center gap-0.5" aria-label={value ? `${value} 星评分` : '未评分'}>
+      {[1, 2, 3, 4, 5].map(score => (
+        <button
+          key={score}
+          type="button"
+          disabled={readOnly}
+          onClick={() => onChange?.(score)}
+          className={`text-base leading-none ${readOnly ? 'cursor-default' : 'active:scale-90'}`}
+          style={{ color: score <= value ? '#F5A623' : '#D8D8D8' }}
+          aria-label={`${score} 星`}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function Memos() {
   const navigate = useNavigate()
   const { profile } = useAuth()
@@ -12,6 +32,7 @@ export default function Memos() {
   const nameOf = (id, fallback = '宝宝') => id ? (profileMap[id]?.nickname || fallback) : fallback
   const [memos, setMemos] = useState([])
   const [comments, setComments] = useState({})
+  const [ratings, setRatings] = useState({})
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingMemo, setEditingMemo] = useState(null)
@@ -32,7 +53,7 @@ export default function Memos() {
     setLoading(true)
     try {
       // 并行加载 memo 和评论
-      const [data, commentsResult] = await Promise.all([
+      const [data, commentsResult, ratingsResult] = await Promise.all([
         fetchWithCache('memos', async () => {
           const { data } = await supabase
             .from('memos')
@@ -43,7 +64,10 @@ export default function Memos() {
         supabase
           .from('memo_comments')
           .select('*')
-          .order('created_at', { ascending: true })
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('memo_ratings')
+          .select('*')
       ])
       
       if (commentsResult.data) {
@@ -53,6 +77,12 @@ export default function Memos() {
           commentsMap[c.memo_id].push(c)
         })
         setComments(commentsMap)
+      }
+
+      if (ratingsResult.data) {
+        const ratingsMap = {}
+        ratingsResult.data.forEach(rating => { ratingsMap[rating.memo_id] = rating })
+        setRatings(ratingsMap)
       }
       
       setMemos(data || [])
@@ -129,6 +159,22 @@ export default function Memos() {
           author_id: profile.id
         })
       if (error) throw error
+
+      // Notification delivery is deliberately independent of saving the
+      // comment, so older databases keep accepting comments until migrated.
+      if (profile?.partner_id) {
+        const { error: notificationError } = await supabase
+          .from('notifications')
+          .insert({
+            recipient_id: profile.partner_id,
+            actor_id: profile.id,
+            type: 'memo_comment',
+            title: '宝宝评论了你的备忘录',
+            body: content,
+            resource_path: '/memos'
+          })
+        if (notificationError) console.warn('提醒未发送:', notificationError.message)
+      }
       
       setCommentInputs(prev => ({ ...prev, [memoId]: '' }))
       invalidateByPrefix('memos')
@@ -150,6 +196,36 @@ export default function Memos() {
       await loadMemos()
     } catch (err) {
       alert('删除失败: ' + err.message)
+    }
+  }
+
+  async function saveRating(memoId, score) {
+    if (!profile?.id) return
+    const previous = ratings[memoId]
+    const optimisticRating = {
+      ...(previous || {}),
+      memo_id: memoId,
+      reviewer_id: profile.id,
+      score
+    }
+    setRatings(current => ({ ...current, [memoId]: optimisticRating }))
+
+    try {
+      const { data, error } = await supabase
+        .from('memo_ratings')
+        .upsert({ memo_id: memoId, reviewer_id: profile.id, score, updated_at: new Date().toISOString() }, { onConflict: 'memo_id,reviewer_id' })
+        .select()
+        .single()
+      if (error) throw error
+      setRatings(current => ({ ...current, [memoId]: data }))
+    } catch (err) {
+      setRatings(current => {
+        const next = { ...current }
+        if (previous) next[memoId] = previous
+        else delete next[memoId]
+        return next
+      })
+      alert('评分保存失败: ' + err.message)
     }
   }
 
@@ -231,7 +307,7 @@ export default function Memos() {
                       {memo.content}
                     </p>
                   </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => openEditModal(memo)}
                       className="text-xs hover:opacity-70 px-2"
@@ -247,6 +323,24 @@ export default function Memos() {
                       删除
                     </button>
                   </div>
+                </div>
+
+                <div className="mt-3 pt-2 flex items-center justify-between" style={{ borderTop: '1px dashed var(--color-primary-light)' }}>
+                  {memo.author_id === profile?.id ? (
+                    <>
+                      <span className="text-xs" style={{ color: 'var(--color-text-light)' }}>宝宝的评价</span>
+                      {ratings[memo.id] ? (
+                        <RatingStars value={ratings[memo.id].score} readOnly />
+                      ) : (
+                        <span className="text-xs" style={{ color: 'var(--color-text-light)', opacity: 0.7 }}>等待评价</span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xs" style={{ color: 'var(--color-text-light)' }}>给这条备忘录评分</span>
+                      <RatingStars value={ratings[memo.id]?.score || 0} onChange={(score) => saveRating(memo.id, score)} />
+                    </>
+                  )}
                 </div>
                 
                 <div className="flex items-center gap-2 mt-3 pt-2" style={{ borderTop: '1px solid var(--color-primary-light)' }}>

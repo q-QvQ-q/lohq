@@ -20,6 +20,18 @@ export function DataCacheProvider({ children }) {
 
   const [profileMap, setProfileMap] = useState({})
 
+  // Cached queries are scoped to the signed-in person. Without this reset, a
+  // second person logging in on the same device could briefly receive the
+  // previous person's cached rows before their own request completes.
+  useEffect(() => {
+    Object.values(cacheTimers.current).forEach(clearTimeout)
+    cacheTimers.current = {}
+    inFlightRef.current = {}
+    cacheRef.current = {}
+    setCache({})
+    setProfileMap({})
+  }, [profile?.id])
+
   useEffect(() => {
     if (!profile?.id) return
     // 预加载所有相关 profiles（自己 + 伴侣），用于前端映射 nickname

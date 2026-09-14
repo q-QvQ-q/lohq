@@ -94,15 +94,19 @@ export default function Albums() {
       const needSign = []
       
       data.forEach(photo => {
-        const existingUrl = photo.url || ''
-        const isValidUrl = existingUrl.startsWith('http') && 
-                          (existingUrl.includes('token') || !existingUrl.includes('signedUrl'))
         const cached = photo.file_path ? signedUrlCache.current.get(photo.file_path) : null
-        
-        if (isValidUrl || (cached && cached.expireAt > Date.now())) {
-          hasValidUrl.push({ photo, cachedUrl: cached?.url })
-        } else if (photo.file_path) {
-          needSign.push(photo)
+
+        // Signed URLs expire. Only reuse one whose expiry is known in this session;
+        // persisted signed URLs from an earlier session must be regenerated.
+        if (photo.file_path) {
+          if (cached && cached.expireAt > Date.now()) {
+            hasValidUrl.push({ photo, cachedUrl: cached.url })
+          } else {
+            needSign.push(photo)
+          }
+        } else if (photo.url?.startsWith('http')) {
+          // Compatibility with legacy records that only contain a public URL.
+          hasValidUrl.push({ photo, cachedUrl: photo.url })
         }
       })
       
@@ -128,7 +132,10 @@ export default function Albums() {
         const filePaths = needSign.map(p => p.file_path)
         const { data: signedUrlsData, error: signedUrlsError } = await supabase.storage
           .from('photos')
-          .createSignedUrls(filePaths, SIGNED_URL_TTL)
+          .createSignedUrls(filePaths, SIGNED_URL_TTL, {
+            // The grid never needs original camera-resolution images.
+            transform: { width: 480, height: 480, resize: 'cover', quality: 70 }
+          })
         
         if (signedUrlsError) {
           console.warn('批量签名URL生成失败:', signedUrlsError)
@@ -159,16 +166,6 @@ export default function Albums() {
             return prev.map(p => map[p.id] || p)
           })
           
-          // 异步持久化签名URL到数据库，下次打开瞬间加载
-          signedPhotos.forEach(photo => {
-            if (photo.signed_url) {
-              supabase
-                .from('photos')
-                .update({ url: photo.signed_url })
-                .eq('id', photo.id)
-                .catch(() => {})  // 静默失败
-            }
-          })
         }
       }
     } catch (err) {
@@ -276,18 +273,12 @@ export default function Albums() {
           if (error) {
             alert('上传失败: ' + error.message)
           } else {
-            // 上传后立即生成签名URL并存入数据库，下次直接使用
-            const { data: signData } = await supabase.storage
-              .from('photos')
-              .createSignedUrl(filePath, SIGNED_URL_TTL)
-            
-            const signedUrl = signData?.signedUrl || filePath
-            
             const { error: insertError } = await supabase
               .from('photos')
               .insert({
                 album_id: currentAlbum.id,
-                url: signedUrl,  // 存签名URL，直接可用
+                // Display URLs are generated in memory because signed URLs expire.
+                url: filePath,
                 file_path: filePath,
                 uploaded_by: profile.id
               })
@@ -335,22 +326,9 @@ export default function Albums() {
   }
 
   function openPhotoViewer(photo) {
-    // 如果已有有效签名URL，直接显示
-    if (photo.signed_url && photo.signed_url.startsWith('http')) {
-      setViewerUrl(photo.signed_url)
-      setViewerTime(photo.uploaded_at)
-      return
-    }
-    
-    // 否则生成签名URL（兼容旧数据）
+    // The grid uses a small transformed preview. Always issue a fresh URL for
+    // the viewer so it can show the original image at full resolution.
     if (photo.file_path) {
-      const cached = signedUrlCache.current.get(photo.file_path)
-      if (cached && cached.expireAt > Date.now()) {
-        setViewerUrl(cached.url)
-        setViewerTime(photo.uploaded_at)
-        return
-      }
-      
       supabase.storage
         .from('photos')
         .createSignedUrl(photo.file_path, SIGNED_URL_TTL)
@@ -459,7 +437,7 @@ export default function Albums() {
                     </div>
                   </button>
                   {/* 操作按钮 */}
-                  <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute top-1 right-1 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => { e.stopPropagation(); openRenameModal(album) }}
                       className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs"
@@ -544,7 +522,7 @@ export default function Albums() {
                   {photo.signed_url !== '__loading__' && (
                     <button
                       onClick={() => deletePhoto(photo.id, photo)}
-                      className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                       style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
                     >
                       ✕

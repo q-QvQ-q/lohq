@@ -47,6 +47,7 @@ export default function WeeklySummaries() {
   const [newRating, setNewRating] = useState(5)
   const [newPartnerRating, setNewPartnerRating] = useState(5)
   const [existingSummary, setExistingSummary] = useState(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (profile?.id) loadSummaries()
@@ -69,9 +70,20 @@ export default function WeeklySummaries() {
           .eq('week_number', currentWeek)
         return data || []
       })
-      setSummaries(data)
+      // Old deployments could contain duplicate rows after a double-click.
+      // Keep the latest row for each author while the database migration
+      // permanently removes duplicates and adds the unique index.
+      const latestByAuthor = new Map()
+      ;(data || []).forEach(summary => {
+        const current = latestByAuthor.get(summary.author_id)
+        const currentTime = new Date(current?.updated_at || current?.created_at || 0).getTime()
+        const summaryTime = new Date(summary.updated_at || summary.created_at || 0).getTime()
+        if (!current || summaryTime >= currentTime) latestByAuthor.set(summary.author_id, summary)
+      })
+      const uniqueSummaries = Array.from(latestByAuthor.values())
+      setSummaries(uniqueSummaries)
       
-      const mine = data.find(s => s.author_id === profile?.id)
+      const mine = uniqueSummaries.find(s => s.author_id === profile?.id)
       setExistingSummary(mine || null)
       
       if (mine) {
@@ -90,11 +102,13 @@ export default function WeeklySummaries() {
   }
 
   async function saveSummary() {
+    if (saving) return
     if (!newContent.trim()) {
       alert('请填写内容')
       return
     }
     
+    setSaving(true)
     try {
       if (existingSummary) {
         const { data, error } = await supabase
@@ -132,6 +146,8 @@ export default function WeeklySummaries() {
     } catch (err) {
       console.error('保存周总结失败:', err)
       alert('保存失败: ' + err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -459,10 +475,11 @@ export default function WeeklySummaries() {
               </button>
               <button
                 onClick={saveSummary}
-                className="flex-1 py-2 rounded-lg text-sm font-bold text-white"
+                disabled={saving}
+                className="flex-1 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-50"
                 style={{ backgroundColor: 'var(--color-primary)' }}
               >
-                保存
+                {saving ? '保存中...' : '保存'}
               </button>
             </div>
           </div>

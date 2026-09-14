@@ -1,5 +1,9 @@
 {
   "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://wselpiozikahgfsgwcdk.supabase.co/:path*"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
