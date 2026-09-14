@@ -13,6 +13,9 @@ create table if not exists public.couple_wallets (
   constraint couple_wallets_unique_pair unique (member_one_id, member_two_id)
 );
 
+commit;
+begin;
+
 create table if not exists public.shared_wallet_transactions (
   id uuid primary key default gen_random_uuid(),
   wallet_id uuid not null references public.couple_wallets(id) on delete cascade,
@@ -29,8 +32,14 @@ create table if not exists public.shared_wallet_transactions (
 create index if not exists shared_wallet_transactions_wallet_date_idx
   on public.shared_wallet_transactions(wallet_id, transaction_date desc, created_at desc);
 
+commit;
+begin;
+
 alter table public.expenses
   add column if not exists shared_wallet_id uuid references public.couple_wallets(id) on delete set null;
+
+commit;
+begin;
 
 alter table public.couple_wallets enable row level security;
 alter table public.shared_wallet_transactions enable row level security;
@@ -59,6 +68,12 @@ create policy "Couple members can view shared wallet transactions"
         and auth.uid() in (cw.member_one_id, cw.member_two_id)
     )
   );
+
+grant select on public.couple_wallets to authenticated;
+grant select on public.shared_wallet_transactions to authenticated;
+
+commit;
+begin;
 
 -- Remove the historical broad update policy. A user may update their own wallet;
 -- partner changes are performed by the validated atomic RPC below.
@@ -265,8 +280,9 @@ revoke all on function public.adjust_shared_wallet(uuid, text, numeric, text, da
 grant execute on function public.ensure_wallet_setup() to authenticated;
 grant execute on function public.apply_partner_wallet_transaction(text, numeric, text, date) to authenticated;
 grant execute on function public.adjust_shared_wallet(uuid, text, numeric, text, date, text) to authenticated;
-grant select on public.couple_wallets to authenticated;
-grant select on public.shared_wallet_transactions to authenticated;
+
+commit;
+begin;
 
 -- Older rows sometimes stored an expiring signed URL instead of the stable
 -- storage object path. Recover that path so photos work on every device.
