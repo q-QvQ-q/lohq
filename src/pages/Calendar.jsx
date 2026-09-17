@@ -4,6 +4,7 @@ import { supabase } from '../supabase/client.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useDataCache } from '../contexts/DataCacheContext.jsx'
 import { formatDate, getAnniversaryTypeLabel } from '../utils/dateUtils.js'
+import { expandTodosForMonth, RECURRENCE_LABELS } from '../utils/todoRecurrence.js'
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -34,7 +35,7 @@ export default function Calendar() {
   const [showAnniversaryModal, setShowAnniversaryModal] = useState(false)
   const [showDiaryModal, setShowDiaryModal] = useState(false)
   
-  const [newTodo, setNewTodo] = useState({ content: '', priority: 'normal' })
+  const [newTodo, setNewTodo] = useState({ content: '', priority: 'normal', recurrence: 'none' })
   const [newAnniversary, setNewAnniversary] = useState({ title: '', date: '', type: 'birthday', is_repeat_yearly: true })
   const [newDiary, setNewDiary] = useState({ mood: 'normal', content: '' })
 
@@ -44,7 +45,7 @@ export default function Calendar() {
   const lastDay = new Date(year, month + 1, 0).getDate()
   const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`
   const cacheKeyDiary = `diaries_${year}_${month}`
-  const cacheKeyTodo = `todos_${year}_${month}`
+  const cacheKeyTodo = `todos_recurring_${year}_${month}`
 
   const getDateKey = useCallback((date) => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -63,7 +64,7 @@ export default function Calendar() {
   const todoMap = useMemo(() => {
     const map = new Map()
     for (const t of todos) {
-      const key = t.due_date
+      const key = t.occurrence_date || t.due_date
       if (!map.has(key)) map.set(key, [])
       map.get(key).push(t)
     }
@@ -145,13 +146,21 @@ export default function Calendar() {
           return data || []
         }),
         fetchWithCache(cacheKeyTodo, async () => {
-          const { data } = await supabase
-            .from('todos')
-            .select('*')
-            .gte('due_date', startDate)
-            .lte('due_date', endDate)
-            .order('due_date', { ascending: true })
-          return data || []
+          const [singleResult, recurringResult, completionsResult] = await Promise.all([
+            supabase.from('todos').select('*').eq('recurrence', 'none')
+              .gte('due_date', startDate).lte('due_date', endDate),
+            supabase.from('todos').select('*').neq('recurrence', 'none')
+              .lte('due_date', endDate),
+            supabase.from('todo_occurrence_completions').select('todo_id, occurrence_date')
+              .gte('occurrence_date', startDate).lte('occurrence_date', endDate)
+          ])
+          for (const result of [singleResult, recurringResult, completionsResult]) {
+            if (result.error) throw result.error
+          }
+          return expandTodosForMonth(
+            [...singleResult.data, ...recurringResult.data],
+            completionsResult.data, year, month
+          )
         }),
         fetchWithCache('anniversaries', async () => {
           const { data } = await supabase.from('anniversaries').select('*')
@@ -175,26 +184,36 @@ export default function Calendar() {
   }
 
   function prevMonth() {
-    setCurrentMonth(new Date(year, month - 1, 1))
+    const target = new Date(year, month - 1, 1)
+    setCurrentMonth(target)
+    setSelectedDate(target)
   }
 
   function nextMonth() {
-    setCurrentMonth(new Date(year, month + 1, 1))
+    const target = new Date(year, month + 1, 1)
+    setCurrentMonth(target)
+    setSelectedDate(target)
   }
 
-  async function toggleTodo(id) {
+  async function toggleTodo(todo) {
     try {
-      const todo = todos.find(t => t.id === id)
       if (!todo) return
-      
-      const { error } = await supabase
-        .from('todos')
-        .update({
+      let result
+      if (todo.recurrence && todo.recurrence !== 'none') {
+        result = todo.is_completed
+          ? await supabase.from('todo_occurrence_completions').delete()
+            .eq('todo_id', todo.id).eq('occurrence_date', todo.occurrence_date)
+          : await supabase.from('todo_occurrence_completions').upsert({
+            todo_id: todo.id, occurrence_date: todo.occurrence_date, completed_by: profile.id
+          }, { onConflict: 'todo_id,occurrence_date' })
+      } else {
+        result = await supabase.from('todos').update({
           is_completed: !todo.is_completed,
           completed_at: !todo.is_completed ? new Date().toISOString() : null,
           completed_by: !todo.is_completed ? profile.id : null
-        })
-        .eq('id', id)
+        }).eq('id', todo.id)
+      }
+      const { error } = result
       if (error) throw error
       invalidateByPrefix('todos')
       await loadData()
@@ -215,11 +234,12 @@ export default function Calendar() {
         .insert({
           content: newTodo.content.trim(),
           priority: newTodo.priority,
+          recurrence: newTodo.recurrence,
           due_date: dateStr,
           created_by: profile.id
         })
       if (error) throw error
-      setNewTodo({ content: '', priority: 'normal' })
+      setNewTodo({ content: '', priority: 'normal', recurrence: 'none' })
       setShowTodoModal(false)
       invalidateByPrefix('todos')
       await loadData()
@@ -278,7 +298,7 @@ export default function Calendar() {
   }
 
   async function deleteTodo(id) {
-    if (!confirm('确定删除这条待办吗？')) return
+    if (!confirm('确定删除这条待办吗？重复待办会删除整个重复安排。')) return
     try {
       const { error } = await supabase
         .from('todos')
@@ -327,7 +347,7 @@ export default function Calendar() {
   const selectedAnniversaries = useMemo(() => getAnniversariesForDate(selectedDate), [getAnniversariesForDate, selectedDate])
   
   const monthDiaries = diaries
-  const pendingTodos = useMemo(() => todos.filter(t => !t.is_completed), [todos])
+  const pendingTodos = useMemo(() => todos.filter(t => !t.is_completed).sort((a, b) => a.occurrence_date.localeCompare(b.occurrence_date)), [todos])
   const allAnniversaries = anniversaries
 
   return (
@@ -569,18 +589,19 @@ export default function Calendar() {
                   ✅ 待办
                 </p>
                 {selectedTodos.map(t => (
-                  <div key={t.id} className="flex items-center gap-2 p-2 rounded-lg mb-1"
+                  <div key={`${t.id}-${t.occurrence_date}`} className="flex items-center gap-2 p-2 rounded-lg mb-1"
                        style={{ backgroundColor: t.is_completed ? 'var(--color-primary-light)' : 'white', border: '1px solid var(--color-primary-light)' }}>
                     <input
                       type="checkbox"
                       checked={t.is_completed}
-                      onChange={() => toggleTodo(t.id)}
+                      onChange={() => toggleTodo(t)}
                       className="w-4 h-4"
                     />
                     <span className={`flex-1 text-sm ${t.is_completed ? 'line-through' : ''}`} 
                           style={{ color: t.is_completed ? 'var(--color-text-light)' : 'var(--color-text)' }}>
                       {t.content}
                     </span>
+                    {t.recurrence && t.recurrence !== 'none' && <span className="text-xs" style={{ color: 'var(--color-text-light)' }}>{RECURRENCE_LABELS[t.recurrence]}</span>}
                     {t.priority === 'high' && (
                       <span className="text-xs px-1 rounded" style={{ backgroundColor: '#FFE0E0', color: '#E74C3C' }}>
                         重要
@@ -689,12 +710,12 @@ export default function Calendar() {
             ) : (
               <div className="space-y-2">
                 {pendingTodos.map(t => (
-                  <div key={t.id} className="flex items-center gap-2 p-2 rounded-lg"
+                  <div key={`${t.id}-${t.occurrence_date}`} className="flex items-center gap-2 p-2 rounded-lg"
                        style={{ backgroundColor: 'white', border: '1px solid var(--color-primary-light)' }}>
                     <input
                       type="checkbox"
                       checked={t.is_completed}
-                      onChange={() => toggleTodo(t.id)}
+                      onChange={() => toggleTodo(t)}
                       className="w-4 h-4"
                     />
                     <div className="flex-1">
@@ -703,7 +724,7 @@ export default function Calendar() {
                       </p>
                       {t.due_date && (
                         <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-light)' }}>
-                          📅 {t.due_date}
+                          📅 {t.occurrence_date} {t.recurrence && t.recurrence !== 'none' ? `· ${RECURRENCE_LABELS[t.recurrence]}` : ''}
                         </p>
                       )}
                     </div>
@@ -879,6 +900,14 @@ export default function Calendar() {
                   重要
                 </button>
               </div>
+              <label className="block text-sm" style={{ color: 'var(--color-text)' }}>
+                重复
+                <select value={newTodo.recurrence}
+                  onChange={(e) => setNewTodo({ ...newTodo, recurrence: e.target.value })}
+                  className="input-field mt-1">
+                  {Object.entries(RECURRENCE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
             </div>
             <div className="flex gap-2 mt-4">
               <button

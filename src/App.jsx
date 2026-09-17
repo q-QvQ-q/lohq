@@ -18,6 +18,7 @@ const Wishes = lazy(() => import('./pages/Wishes.jsx'))
 const Albums = lazy(() => import('./pages/Albums.jsx'))
 const Wallet = lazy(() => import('./pages/Wallet.jsx'))
 const Memos = lazy(() => import('./pages/Memos.jsx'))
+const Notifications = lazy(() => import('./pages/Notifications.jsx'))
 const WeeklySummaries = lazy(() => import('./pages/WeeklySummaries.jsx'))
 
 function PageLoading() {
@@ -112,6 +113,7 @@ export default function App() {
               <Route path="albums" element={<Albums />} />
               <Route path="wallet" element={<Wallet />} />
               <Route path="memos" element={<Memos />} />
+              <Route path="notifications" element={<Notifications />} />
               <Route path="weekly" element={<WeeklySummaries />} />
               <Route path="settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />

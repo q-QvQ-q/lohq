@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabase/client.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useDataCache } from '../contexts/DataCacheContext.jsx'
@@ -27,6 +27,9 @@ function RatingStars({ value = 0, onChange, readOnly = false }) {
 
 export default function Memos() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const targetMemoId = searchParams.get('memo')
+  const commentPending = useRef(new Set())
   const { profile } = useAuth()
   const { fetchWithCache, invalidateByPrefix, profileMap } = useDataCache()
   const nameOf = (id, fallback = '宝宝') => id ? (profileMap[id]?.nickname || fallback) : fallback
@@ -39,10 +42,17 @@ export default function Memos() {
   const [newMemo, setNewMemo] = useState({ title: '', content: '' })
   const [expandedMemos, setExpandedMemos] = useState({})
   const [commentInputs, setCommentInputs] = useState({})
+  const [sendingComments, setSendingComments] = useState({})
 
   useEffect(() => {
     loadMemos()
   }, [profile?.id])
+
+  useEffect(() => {
+    if (!targetMemoId || !memos.some(memo => memo.id === targetMemoId)) return
+    setExpandedMemos(previous => ({ ...previous, [targetMemoId]: true }))
+    window.requestAnimationFrame(() => document.getElementById(`memo-${targetMemoId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+  }, [targetMemoId, memos])
 
   async function loadMemos() {
     if (!profile?.id) {
@@ -148,39 +158,49 @@ export default function Memos() {
 
   async function addComment(memoId) {
     const content = commentInputs[memoId]?.trim()
-    if (!content) return
+    if (!content || commentPending.current.has(memoId)) return
+    commentPending.current.add(memoId)
+    setSendingComments(previous => ({ ...previous, [memoId]: true }))
     
     try {
-      const { error } = await supabase
+      const { data: savedComment, error } = await supabase
         .from('memo_comments')
         .insert({
           memo_id: memoId,
           content: content,
           author_id: profile.id
-        })
+        }).select().single()
       if (error) throw error
+
+      setComments(previous => ({
+        ...previous,
+        [memoId]: [...(previous[memoId] || []).filter(item => item.id !== savedComment.id), savedComment]
+      }))
+      setCommentInputs(previous => ({ ...previous, [memoId]: '' }))
 
       // Notification delivery is deliberately independent of saving the
       // comment, so older databases keep accepting comments until migrated.
       if (profile?.partner_id) {
+        const memo = memos.find(item => item.id === memoId)
+        const memoDate = memo?.created_at ? new Date(memo.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) : ''
         const { error: notificationError } = await supabase
           .from('notifications')
           .insert({
             recipient_id: profile.partner_id,
             actor_id: profile.id,
             type: 'memo_comment',
-            title: '宝宝评论了你的备忘录',
-            body: content,
-            resource_path: '/memos'
+            title: `${memoDate}的备忘录有新评论`,
+            body: `${memo?.title ? `${memo.title} · ` : ''}${content}`,
+            resource_path: `/memos?memo=${memoId}`
           })
         if (notificationError) console.warn('提醒未发送:', notificationError.message)
       }
       
-      setCommentInputs(prev => ({ ...prev, [memoId]: '' }))
-      invalidateByPrefix('memos')
-      await loadMemos()
     } catch (err) {
       alert('评论失败: ' + err.message)
+    } finally {
+      commentPending.current.delete(memoId)
+      setSendingComments(previous => ({ ...previous, [memoId]: false }))
     }
   }
 
@@ -192,8 +212,7 @@ export default function Memos() {
         .delete()
         .eq('id', id)
       if (error) throw error
-      invalidateByPrefix('memos')
-      await loadMemos()
+      setComments(previous => Object.fromEntries(Object.entries(previous).map(([memoId, list]) => [memoId, list.filter(item => item.id !== id)])))
     } catch (err) {
       alert('删除失败: ' + err.message)
     }
@@ -295,7 +314,7 @@ export default function Memos() {
             const isExpanded = expandedMemos[memo.id] || false
             
             return (
-              <div key={memo.id} className="card relative group">
+              <div key={memo.id} id={`memo-${memo.id}`} className="card relative group">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     {memo.title && (
@@ -353,6 +372,9 @@ export default function Memos() {
                   </span>
                   <span className="text-xs" style={{ color: 'var(--color-text-light)', opacity: 0.6 }}>
                     {formatTime(memo.updated_at)}
+                  </span>
+                  <span className="text-xs" style={{ color: 'var(--color-text-light)' }}>
+                    {new Date(memo.created_at).toLocaleDateString('zh-CN')}
                   </span>
                   {memo.created_at !== memo.updated_at && (
                     <span className="text-xs" style={{ color: 'var(--color-text-light)', opacity: 0.6 }}>
@@ -418,6 +440,7 @@ export default function Memos() {
                         value={commentInputs[memo.id] || ''}
                         onChange={(e) => setCommentInputs(prev => ({ ...prev, [memo.id]: e.target.value }))}
                         onKeyDown={(e) => e.key === 'Enter' && addComment(memo.id)}
+                        disabled={!!sendingComments[memo.id]}
                         placeholder="写评论..."
                         className="flex-1 p-2 rounded-lg text-xs"
                         style={{ 
@@ -429,10 +452,11 @@ export default function Memos() {
                       />
                       <button
                         onClick={() => addComment(memo.id)}
+                        disabled={!!sendingComments[memo.id]}
                         className="px-3 py-2 rounded-lg text-xs font-bold text-white"
                         style={{ backgroundColor: 'var(--color-primary)' }}
                       >
-                        发送
+                        {sendingComments[memo.id] ? '发送中...' : '发送'}
                       </button>
                     </div>
                   </div>
