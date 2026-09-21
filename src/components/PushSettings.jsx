@@ -58,7 +58,7 @@ export default function PushSettings() {
         user_id: user.id,
         endpoint: subscription.endpoint,
         p256dh: json.keys.p256dh,
-        auth: json.keys.auth
+        auth_secret: json.keys.auth
       }, { onConflict: 'endpoint' })
       if (saveError) throw saveError
       setEnabled(true)
