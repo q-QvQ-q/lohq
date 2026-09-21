@@ -19,7 +19,11 @@ const QUICK_LINKS = [
   { to: '/calendar?tab=diary', title: '心情日记', icon: 'note', description: '写下今天的心情' },
   { to: '/calendar?tab=anniversary', title: '纪念日', icon: 'calendar', description: '记住重要的日子' },
   { to: '/albums', title: '我们的相册', icon: 'image', description: '收藏一起的瞬间' },
-  { to: '/wishes', title: '愿望清单', icon: 'sparkle', description: '把以后慢慢实现' }
+  { to: '/wishes', title: '愿望清单', icon: 'sparkle', description: '把以后慢慢实现' },
+  { to: '/wallet', title: '恋爱账单', icon: 'wallet', description: '记录我们的小开销' },
+  { to: '/memos', title: '备忘录', icon: 'note', description: '留下彼此的提醒' },
+  { to: '/reflections', title: '检讨书', icon: 'file', description: '认真写下想说的话' },
+  { to: '/weekly', title: '周总结', icon: 'chart', description: '回顾这一周的我们' }
 ]
 
 function localDayRange(date = new Date()) {

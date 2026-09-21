@@ -18,12 +18,14 @@
 
 @layer base {
   html {
+    background: var(--app-background-fill);
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     user-select: none;
   }
   body {
-    background-color: var(--color-background);
+    min-height: 100dvh;
+    background-color: var(--app-background-fill);
     color: var(--color-text);
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -333,7 +335,7 @@
   --stroke: rgba(255, 255, 255, .78);
   --shadow: 0 16px 42px rgba(92, 56, 78, .12), inset 0 1px 0 rgba(255, 255, 255, .72), 0 1px 3px rgba(92, 56, 78, .065);
   --danger: #B3424B;
-  --pill-fill: linear-gradient(145deg, rgba(255,255,255,.72), rgba(232,246,255,.48));
+  --pill-fill: linear-gradient(145deg, rgba(255,255,255,.72), rgba(255,232,240,.48));
   --pill-stroke: rgba(255,255,255,.94);
   --pill-shadow: inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(93,139,184,.1), 0 5px 15px rgba(54,91,132,.09);
 }
@@ -348,8 +350,8 @@
   --stroke: rgba(224, 215, 255, .24);
   --shadow: 0 18px 46px rgba(0, 0, 0, .38), inset 0 1px rgba(255, 255, 255, .08);
   --danger: #FF9298;
-  --pill-fill: linear-gradient(145deg, rgba(91,116,148,.46), rgba(49,67,90,.48));
-  --pill-stroke: rgba(225,238,255,.28);
+  --pill-fill: linear-gradient(145deg, rgba(118,70,104,.48), rgba(57,33,65,.52));
+  --pill-stroke: rgba(255,221,237,.28);
   --pill-shadow: inset 0 1px 0 rgba(255,255,255,.17), inset 0 -1px 0 rgba(0,0,0,.08), 0 6px 18px rgba(0,0,0,.2);
 }
 body { min-width: 320px; line-height: 1.5; isolation: isolate; }
@@ -378,7 +380,7 @@ button:disabled { cursor: not-allowed; }
 }
 .card, .card-pink { padding: 1.25rem; }
 .card-pink { background: linear-gradient(125deg, var(--surface-strong) 45%, color-mix(in srgb, var(--color-primary-light) 58%, transparent)); }
-:root[data-theme='dark'] .card-pink { background: linear-gradient(125deg, var(--surface-strong) 45%, rgba(46, 70, 104, .7)); }
+:root[data-theme='dark'] .card-pink { background: linear-gradient(125deg, var(--surface-strong) 45%, rgba(92, 51, 82, .7)); }
 .glass-panel { background: var(--surface-strong); }
 .task-card, .calendar-day, .anniversary-entry, .mood-card, .quick-card, .upcoming-strip, .upcoming-item, .avatar-settings, .modal-surface, .bottom-nav, .glass-button, .btn-secondary {
   backdrop-filter: blur(22px) saturate(145%);
@@ -401,7 +403,7 @@ button:disabled { cursor: not-allowed; }
 }
 .btn-primary:hover:not(:disabled) { background: var(--color-primary-dark); transform: translateY(-1px); }
 :root[data-theme='dark'] .btn-primary { color: #10151e; }
-:root[data-theme='dark'] .btn-primary:hover:not(:disabled) { background: #85b6fb; }
+:root[data-theme='dark'] .btn-primary:hover:not(:disabled) { background: #E7A8C2; }
 .btn-danger { border-radius: 14px; background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); font-size: .875rem; font-weight: 600; }
 .btn-danger:hover { background: color-mix(in srgb, var(--danger) 18%, transparent); transform: translateY(-1px); }
 .input-field { background: var(--surface-strong); border: 1px solid var(--stroke); border-radius: 13px; color: var(--color-text); }
@@ -419,7 +421,7 @@ button:disabled { cursor: not-allowed; }
 }
 .tag, .meta-chip { padding: .32rem .7rem; font-size: .75rem; font-weight: 600; white-space: nowrap; }
 .glass-pill.is-selected, .tag.is-selected { background: linear-gradient(145deg, rgba(196,132,153,.3), rgba(255,242,246,.72)); border-color: rgba(183,112,137,.42); color: var(--color-primary-dark); }
-:root[data-theme='dark'] .glass-pill.is-selected, :root[data-theme='dark'] .tag.is-selected { background: linear-gradient(145deg, rgba(91,145,214,.42), rgba(56,91,133,.52)); border-color: rgba(161,202,255,.42); }
+:root[data-theme='dark'] .glass-pill.is-selected, :root[data-theme='dark'] .tag.is-selected { background: linear-gradient(145deg, rgba(176,94,139,.44), rgba(91,47,82,.54)); border-color: rgba(244,184,215,.4); }
 .task-card { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .75rem; padding: 1rem; border-radius: 17px; background: var(--surface-strong); border: 1px solid var(--stroke); transition: border-color .18s, transform .18s, box-shadow .18s; }
 .task-card:hover { border-color: color-mix(in srgb, var(--color-primary) 35%, var(--stroke)); box-shadow: 0 8px 20px rgba(25, 51, 82, .06); }
 .task-card.is-complete { background: var(--surface-muted); }
@@ -433,7 +435,7 @@ button:disabled { cursor: not-allowed; }
 .segmented-control { display: flex; gap: .2rem; padding: .25rem; border-radius: 999px; background: var(--pill-fill); border: 1px solid var(--pill-stroke); box-shadow: var(--pill-shadow); backdrop-filter: blur(24px) saturate(165%); -webkit-backdrop-filter: blur(24px) saturate(165%); }
 .segmented-control > button { flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: .35rem; padding: .58rem .5rem; border-radius: 999px; color: var(--color-text-light); font-size: .84rem; font-weight: 600; transition: background-color .18s, color .18s, box-shadow .18s; }
 .segmented-control > button[aria-selected='true'], .segmented-control > button[aria-pressed='true'] { color: var(--color-text); background: linear-gradient(145deg, rgba(255,255,255,.88), rgba(221,241,255,.68)); border: 1px solid var(--pill-stroke); box-shadow: var(--pill-shadow); backdrop-filter: blur(24px) saturate(165%); -webkit-backdrop-filter: blur(24px) saturate(165%); }
-:root[data-theme='dark'] .segmented-control > button[aria-selected='true'], :root[data-theme='dark'] .segmented-control > button[aria-pressed='true'] { background: linear-gradient(145deg, rgba(113,145,184,.56), rgba(64,88,119,.52)); }
+:root[data-theme='dark'] .segmented-control > button[aria-selected='true'], :root[data-theme='dark'] .segmented-control > button[aria-pressed='true'] { background: linear-gradient(145deg, rgba(148,84,119,.58), rgba(82,47,80,.54)); }
 :root[data-theme='dark'] .bg-red-50 { background: rgba(179, 66, 75, .13); border-color: rgba(255, 146, 152, .28); color: var(--danger); }
 .modal-backdrop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; justify-content: center; background: rgba(10, 18, 29, .42); backdrop-filter: blur(8px); padding: 0; }
 .modal-surface { width: 100%; max-width: 480px; max-height: min(90dvh, 760px); overflow: auto; padding: 1.5rem; background: var(--surface-strong); border: 1px solid var(--stroke); border-radius: 24px 24px 0 0; box-shadow: 0 24px 70px rgba(0,0,0,.2); animation: modalIn .22s ease-out; }
@@ -449,7 +451,7 @@ button:disabled { cursor: not-allowed; }
 .calendar-day__markers { min-height: 13px; margin-top: 2px; display: flex; align-items: center; justify-content: center; gap: 3px; color: var(--color-primary-dark); }
 .calendar-mood { display: inline-grid; place-items: center; }
 .anniversary-entry {
-  --anniversary-accent: #527eb8;
+  --anniversary-accent: #A75C75;
   display: flex;
   align-items: center;
   gap: .55rem;
@@ -462,7 +464,7 @@ button:disabled { cursor: not-allowed; }
 .anniversary-entry--birthday { --anniversary-accent: #9368c7; }
 .anniversary-entry--love { --anniversary-accent: #d65f83; }
 .anniversary-entry--holiday { --anniversary-accent: #c58a29; }
-.anniversary-entry--other { --anniversary-accent: #4f82bd; }
+.anniversary-entry--other { --anniversary-accent: #B06C88; }
 .anniversary-entry.is-today { border-color: color-mix(in srgb, var(--anniversary-accent) 68%, var(--stroke)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--anniversary-accent) 16%, transparent), inset 0 1px rgba(255,255,255,.32); }
 .anniversary-entry__icon { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; border-radius: 11px; color: var(--anniversary-accent); background: color-mix(in srgb, var(--anniversary-accent) 14%, var(--surface-strong)); }
 .anniversary-entry__type { padding: .2rem .45rem; border-radius: 999px; color: var(--anniversary-accent); background: color-mix(in srgb, var(--anniversary-accent) 12%, var(--surface-strong)); font-size: .67rem; font-weight: 700; }
@@ -473,7 +475,7 @@ button:disabled { cursor: not-allowed; }
 .feature-icon { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: var(--color-primary-light); color: var(--color-primary-dark); }
 .bottom-nav { background: var(--surface-strong); border: 1px solid var(--stroke); box-shadow: 0 8px 30px rgba(0,0,0,.1); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
 .nav-active-glass { border-radius: 999px; background: linear-gradient(145deg, rgba(247,221,230,.82), rgba(255,255,255,.62)); border: 1px solid rgba(190,126,148,.46); box-shadow: var(--pill-shadow); backdrop-filter: blur(24px) saturate(165%); -webkit-backdrop-filter: blur(24px) saturate(165%); color: var(--color-primary-dark); }
-:root[data-theme='dark'] .nav-active-glass { background: linear-gradient(145deg, rgba(86,124,174,.52), rgba(50,75,109,.52)); border-color: rgba(165,205,255,.38); }
+:root[data-theme='dark'] .nav-active-glass { background: linear-gradient(145deg, rgba(157,85,123,.55), rgba(80,45,77,.55)); border-color: rgba(244,189,217,.36); }
 :root[data-theme='dark'] .site-logo, :root[data-theme='dark'] .nav-art { filter: brightness(0) invert(1); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
 
@@ -561,11 +563,11 @@ button:disabled { cursor: not-allowed; }
 .avatar-settings__button:disabled { opacity: .62; }
 .avatar-settings__link { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: #c55675; background: #f8d7e0; }
 :root[data-theme='dark'] .memory-hero { border-color: rgba(224,215,255,.18); background: linear-gradient(155deg, rgba(31,25,62,.82), rgba(18,16,42,.79)); box-shadow: 0 28px 68px rgba(0,0,0,.4); }
-:root[data-theme='dark'] .memory-hero__eyebrow, :root[data-theme='dark'] .mood-card__icon { background: rgba(113,145,184,.2); }
-:root[data-theme='dark'] .couple-portraits__heart { border-color: #28394f; background: #6b3e54; color: #ffd5e1; }
-:root[data-theme='dark'] .profile-avatar { border-color: rgba(222,237,255,.25); }
-:root[data-theme='dark'] .mood-card--mine { background: linear-gradient(145deg, rgba(40,43,78,.62), rgba(40,75,116,.34)); }
-:root[data-theme='dark'] .mood-card--theirs { background: linear-gradient(145deg, rgba(44,38,74,.62), rgba(105,58,86,.34)); }
+:root[data-theme='dark'] .memory-hero__eyebrow, :root[data-theme='dark'] .mood-card__icon { background: rgba(143,79,115,.22); }
+:root[data-theme='dark'] .couple-portraits__heart { border-color: #462240; background: #7B3F62; color: #FFE0ED; }
+:root[data-theme='dark'] .profile-avatar { border-color: rgba(255,222,237,.27); }
+:root[data-theme='dark'] .mood-card--mine { background: linear-gradient(145deg, rgba(67,37,66,.66), rgba(113,55,93,.36)); }
+:root[data-theme='dark'] .mood-card--theirs { background: linear-gradient(145deg, rgba(65,35,66,.66), rgba(129,61,96,.38)); }
 @media (max-width: 420px) {
   .memory-hero { min-height: 320px; border-radius: 28px; }
   .memory-hero__topline { align-items: flex-start; flex-direction: column; gap: .45rem; }

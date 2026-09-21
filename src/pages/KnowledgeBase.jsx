@@ -69,19 +69,18 @@ export default function KnowledgeBase() {
   return (
     <div className="space-y-4">
       {/* Header with back button */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-1 text-sm font-bold hover:opacity-70 transition-opacity"
-            style={{ color: 'var(--color-text)' }}
-          >
-            <span>←</span> 返回
-          </button>
-        </div>
-        <h1 className="page-title">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+        <button
+          onClick={() => navigate(-1)}
+          className="justify-self-start flex items-center gap-1 text-sm font-bold hover:opacity-70 transition-opacity"
+          style={{ color: 'var(--color-text)' }}
+        >
+          <span>←</span> 返回
+        </button>
+        <h1 className="page-title justify-self-center" style={{ marginBottom: 0 }}>
           <Icon name="book" size={21} /> 错题本
         </h1>
+        <div aria-hidden="true" />
       </div>
 
       {/* Tag Filter */}

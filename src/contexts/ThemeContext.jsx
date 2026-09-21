@@ -13,8 +13,8 @@ export const THEMES = {
   dark: {
     name: '黑夜模式',
     colors: {
-      primary: '#619DF1', primaryLight: '#25344A', primaryDark: '#A6C9FF',
-      text: '#F3F6FB', textLight: '#BBC8D8', background: '#0C121B', accent: '#314966'
+      primary: '#B86D98', primaryLight: '#352039', primaryDark: '#F1BDD4',
+      text: '#FFF5FA', textLight: '#DCC3D1', background: '#160D1B', accent: '#4B2B48'
     }
   }
 }
@@ -37,6 +37,10 @@ export function ThemeProvider({ children }) {
       const cssName = key.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`)
       root.style.setProperty(`--color-${cssName}`, value)
     })
+    document.querySelector('meta[name="theme-color"]')?.setAttribute(
+      'content',
+      theme === 'dark' ? '#160D1B' : '#FFF8FA'
+    )
     localStorage.setItem('lohq_theme', theme)
   }, [theme])
 
