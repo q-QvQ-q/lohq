@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase/client.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useDataCache } from '../contexts/DataCacheContext.jsx'
+import Icon from '../components/Icon.jsx'
 
 export default function Wishes() {
   const navigate = useNavigate()
@@ -115,9 +116,8 @@ export default function Wishes() {
   return (
     <div className="space-y-4">
       {loading && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs flex items-center gap-2"
-             style={{ backgroundColor: 'var(--color-primary)', color: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-          <span className="animate-spin">🌟</span> 加载中...
+        <div className="glass-pill fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 text-xs flex items-center gap-2">
+          <Icon name="sparkle" size={16} /> 加载中...
         </div>
       )}
       {/* Header */}
@@ -130,13 +130,13 @@ export default function Wishes() {
           <span>←</span> 返回
         </button>
         <h1 className="page-title" style={{ marginBottom: 0 }}>
-          <span>✨</span> 愿望清单
+          <Icon name="sparkle" size={21} /> 愿望清单
         </h1>
         <button
           onClick={() => setShowModal(true)}
           className="btn-primary text-sm"
         >
-          + 添加
+          <Icon name="plus" size={16} /> 添加
         </button>
       </div>
 
@@ -152,7 +152,7 @@ export default function Wishes() {
             color: 'var(--color-text)'
           }}
         >
-          🌟 待实现 ({pendingWishes.length})
+          待实现 ({pendingWishes.length})
         </button>
         <button
           onClick={() => setActiveTab('completed')}
@@ -164,7 +164,7 @@ export default function Wishes() {
             color: 'var(--color-text)'
           }}
         >
-          🎉 已完成 ({completedWishes.length})
+          已完成 ({completedWishes.length})
         </button>
       </div>
 
@@ -173,7 +173,7 @@ export default function Wishes() {
         <div>
           {pendingWishes.length === 0 ? (
             <div className="card text-center py-8">
-              <span className="text-4xl block mb-2">🌟</span>
+              <Icon name="sparkle" size={26} className="mx-auto mb-2" />
               <p style={{ color: 'var(--color-text-light)' }}>还没有愿望哦</p>
               <p className="text-xs mt-1" style={{ color: 'var(--color-text-light)', opacity: 0.6 }}>
                 添加一个想和宝宝一起做的事吧
@@ -190,7 +190,7 @@ export default function Wishes() {
                       style={{ borderColor: 'var(--color-primary)' }}
                       title="标记为完成"
                     >
-                      <span className="text-xs" style={{ color: 'var(--color-primary)' }}>✓</span>
+                      <Icon name="check" size={13} />
                     </button>
                     <div className="flex-1">
                       <p className="font-bold" style={{ color: 'var(--color-text)' }}>{wish.content}</p>
@@ -206,7 +206,7 @@ export default function Wishes() {
                       style={{ color: 'var(--color-text-light)' }}
                       title="删除"
                     >
-                      🗑️
+                      <Icon name="trash" size={16} />
                     </button>
                   </div>
                 </div>
@@ -221,7 +221,7 @@ export default function Wishes() {
         <div>
           {completedWishes.length === 0 ? (
             <div className="card text-center py-8">
-              <span className="text-4xl block mb-2">🎁</span>
+              <Icon name="gift" size={26} className="mx-auto mb-2" />
               <p style={{ color: 'var(--color-text-light)' }}>还没有完成的愿望</p>
               <p className="text-xs mt-1" style={{ color: 'var(--color-text-light)', opacity: 0.6 }}>
                 完成愿望后会出现在这里
@@ -236,7 +236,7 @@ export default function Wishes() {
                       className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5"
                       style={{ backgroundColor: 'var(--color-primary)' }}
                     >
-                      <span className="text-xs text-white">✓</span>
+                      <Icon name="check" size={13} />
                     </div>
                     <div className="flex-1">
                       <p className="font-bold line-through" style={{ color: 'var(--color-text-light)' }}>
@@ -244,7 +244,7 @@ export default function Wishes() {
                       </p>
                       {wish.completed_at && (
                         <p className="text-xs mt-1" style={{ color: 'var(--color-primary-dark)' }}>
-                          🎉 {new Date(wish.completed_at).toLocaleDateString()} 完成
+                          {new Date(wish.completed_at).toLocaleDateString()} 完成
                         </p>
                       )}
                     </div>
@@ -255,7 +255,7 @@ export default function Wishes() {
                         style={{ color: 'var(--color-text-light)' }}
                         title="撤销"
                       >
-                        ↩️
+                        <Icon name="undo" size={16} />
                       </button>
                       <button
                         onClick={() => deleteWish(wish.id)}
@@ -263,7 +263,7 @@ export default function Wishes() {
                         style={{ color: 'var(--color-text-light)' }}
                         title="删除"
                       >
-                        🗑️
+                        <Icon name="trash" size={16} />
                       </button>
                     </div>
                   </div>
@@ -276,9 +276,8 @@ export default function Wishes() {
 
       {/* Add Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-             style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="card w-full max-w-md">
+        <div className="modal-backdrop" role="presentation">
+          <div className="modal-surface" role="dialog" aria-modal="true" aria-label="添加愿望">
             <h3 className="font-bold mb-4" style={{ color: 'var(--color-text)' }}>
               添加愿望
             </h3>

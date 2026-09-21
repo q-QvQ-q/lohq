@@ -4,6 +4,7 @@ import { supabase } from '../supabase/client.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useDataCache } from '../contexts/DataCacheContext.jsx'
 import { formatTime } from '../utils/dateUtils.js'
+import Icon from '../components/Icon.jsx'
 
 function RatingStars({ value = 0, onChange, readOnly = false }) {
   return (
@@ -18,7 +19,7 @@ function RatingStars({ value = 0, onChange, readOnly = false }) {
           style={{ color: score <= value ? '#F5A623' : '#D8D8D8' }}
           aria-label={`${score} 星`}
         >
-          ★
+          <Icon name="star" size={16} fill={score <= value ? 'currentColor' : 'none'} />
         </button>
       ))}
     </div>
@@ -270,9 +271,8 @@ export default function Memos() {
   return (
     <div className="space-y-4">
       {loading && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs flex items-center gap-2"
-             style={{ backgroundColor: 'var(--color-primary)', color: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-          <span className="animate-spin">📝</span> 加载中...
+        <div className="glass-pill fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 text-xs flex items-center gap-2">
+          <Icon name="note" size={16} /> 加载中...
         </div>
       )}
       {/* Header */}
@@ -285,7 +285,7 @@ export default function Memos() {
           <span>←</span> 返回
         </button>
         <h1 className="page-title" style={{ marginBottom: 0 }}>
-          <span>📝</span> 备忘录
+          <Icon name="note" size={21} /> 备忘录
         </h1>
         <button
           onClick={openCreateModal}
@@ -300,7 +300,7 @@ export default function Memos() {
       <div className="space-y-3">
         {memos.length === 0 ? (
           <div className="text-center py-12 card">
-            <span className="text-4xl block mb-3">📝</span>
+            <Icon name="note" size={27} className="mx-auto mb-3" />
             <p className="text-sm" style={{ color: 'var(--color-text-light)' }}>
               还没有备忘录
             </p>
@@ -386,7 +386,7 @@ export default function Memos() {
                     className="ml-auto text-xs flex items-center gap-1 hover:opacity-70"
                     style={{ color: 'var(--color-text-light)' }}
                   >
-                    💬 {memoComments.length} 条评论 {isExpanded ? '▲' : '▼'}
+                    {memoComments.length} 条评论 {isExpanded ? '▲' : '▼'}
                   </button>
                 </div>
 
@@ -421,7 +421,7 @@ export default function Memos() {
                                 className="text-xs hover:opacity-70 flex-shrink-0"
                                 style={{ color: 'var(--color-text-light)' }}
                               >
-                                ✕
+                                <Icon name="x" size={15} />
                               </button>
                             )}
                           </div>
@@ -473,7 +473,7 @@ export default function Memos() {
              style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="card w-full max-w-md max-h-[80vh] overflow-y-auto">
             <h3 className="font-bold mb-4" style={{ color: 'var(--color-text)' }}>
-              {editingMemo ? '✏️ 编辑备忘录' : '📝 新建备忘录'}
+              {editingMemo ? '编辑备忘录' : '新建备忘录'}
             </h3>
             
             <div className="space-y-3">

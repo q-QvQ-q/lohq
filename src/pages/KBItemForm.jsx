@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase/client.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useDataCache } from '../contexts/DataCacheContext.jsx'
+import Icon from '../components/Icon.jsx'
 
 export default function KBItemForm() {
   const { id } = useParams()
@@ -134,9 +135,8 @@ export default function KBItemForm() {
   return (
     <div className="space-y-4 animate-fade-in">
       {loading && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs flex items-center gap-2"
-             style={{ backgroundColor: 'var(--color-primary)', color: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-          <span className="animate-spin">📝</span> 加载中...
+        <div className="glass-pill fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 text-xs flex items-center gap-2">
+          <Icon name="note" size={16} /> 加载中...
         </div>
       )}
       <div className="flex items-center justify-between">
@@ -148,7 +148,7 @@ export default function KBItemForm() {
           <span>←</span> 返回
         </button>
         <h1 className="page-title">
-          <span>{isEditing ? '✏️' : '➕'}</span>
+          <Icon name={isEditing ? 'pencil' : 'plus'} size={20} />
           {isEditing ? '编辑条目' : '新增条目'}
         </h1>
         <div className="w-16" />
@@ -183,7 +183,7 @@ export default function KBItemForm() {
                   style={{ backgroundColor: 'var(--color-primary)', color: '#fff' }}
                 >
                   #{tag}
-                  <span className="text-xs">✕</span>
+                  <Icon name="x" size={15} />
                 </span>
               ))}
             </div>
@@ -236,7 +236,7 @@ export default function KBItemForm() {
         {/* Male Content */}
         <div className="card">
           <label className="label-text flex items-center gap-2">
-            <span>👦</span> 男生应该怎么做
+            <Icon name="user" size={17} /> 男生应该怎么做
           </label>
           <textarea
             value={contentMale}
@@ -250,7 +250,7 @@ export default function KBItemForm() {
         {/* Female Content */}
         <div className="card">
           <label className="label-text flex items-center gap-2">
-            <span>👧</span> 女生应该怎么做
+            <Icon name="user" size={17} /> 女生应该怎么做
           </label>
           <textarea
             value={contentFemale}
@@ -271,7 +271,7 @@ export default function KBItemForm() {
             取消
           </button>
           <button type="submit" className="btn-primary flex-1" disabled={saving}>
-            {saving ? '保存中...' : '💾 保存'}
+            {saving ? '保存中...' : '保存'}
           </button>
         </div>
       </form>

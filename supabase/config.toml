@@ -1,0 +1,3 @@
+[functions.push-dispatch]
+verify_jwt = false
+entrypoint = './functions/push-dispatch/index.js'

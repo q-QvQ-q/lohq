@@ -4,6 +4,7 @@ import { useAuth } from './contexts/AuthContext.jsx'
 import { ThemeProvider } from './contexts/ThemeContext.jsx'
 import { DataCacheProvider } from './contexts/DataCacheContext.jsx'
 import Layout from './components/Layout.jsx'
+import Icon from './components/Icon.jsx'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
 
@@ -20,12 +21,35 @@ const Wallet = lazy(() => import('./pages/Wallet.jsx'))
 const Memos = lazy(() => import('./pages/Memos.jsx'))
 const Notifications = lazy(() => import('./pages/Notifications.jsx'))
 const WeeklySummaries = lazy(() => import('./pages/WeeklySummaries.jsx'))
+const Reflections = lazy(() => import('./pages/Reflections.jsx'))
+
+const HOME_PREVIEW_DATA = {
+  profile: { id: 'preview-me', nickname: '小蓝', avatar_url: '' },
+  partnerProfile: { id: 'preview-partner', nickname: '小樱', avatar_url: '' },
+  startDate: '2025-01-29',
+  todayDiaries: [
+    { id: 'preview-diary-1', author_id: 'preview-me', mood: 'happy', content: '忙完以后一起吃了晚饭，今天也很开心。', created_at: new Date().toISOString() },
+    { id: 'preview-diary-2', author_id: 'preview-partner', mood: 'sweet', content: '被认真惦记着，就是今天最甜的事情。', created_at: new Date().toISOString() }
+  ],
+  anniversaries: []
+}
+
+const CALENDAR_PREVIEW_DATA = {
+  diaries: [],
+  todos: [],
+  anniversaries: [
+    { id: 'preview-love', title: '我们的纪念日', date: '2026-09-21', type: 'love', is_repeat_yearly: true, remind_enabled: true, remind_time: '20:00' },
+    { id: 'preview-birthday', title: '小蓝生日', date: '2026-09-08', type: 'birthday', is_repeat_yearly: true, remind_enabled: false },
+    { id: 'preview-holiday', title: '第一次旅行', date: '2026-09-15', type: 'holiday', is_repeat_yearly: true, remind_enabled: false },
+    { id: 'preview-other', title: '搬进新家的日子', date: '2026-09-28', type: 'other', is_repeat_yearly: true, remind_enabled: false }
+  ]
+}
 
 function PageLoading() {
   return (
     <div className="flex items-center justify-center py-12">
       <div className="animate-pulse text-sm" style={{ color: 'var(--color-text-light)' }}>
-        <span className="mr-2">🐱</span>加载中...
+        <Icon name="circle" size={16} className="mr-2" />加载中...
       </div>
     </div>
   )
@@ -60,9 +84,9 @@ function PublicRoute({ children }) {
 function NotFound() {
   const navigate = useNavigate()
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ backgroundColor: 'var(--color-background)' }}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-6">
       <div className="text-center">
-        <span className="text-6xl mb-4 block">🐱</span>
+        <Icon name="search" size={38} className="mx-auto mb-4" />
         <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--color-text)' }}>页面走丢了</h1>
         <p className="mb-6" style={{ color: 'var(--color-text-light)' }}>宝宝，这个页面找不到了哦~</p>
         <button onClick={() => navigate('/')} className="btn-primary">
@@ -79,6 +103,12 @@ export default function App() {
       <DataCacheProvider>
         <Suspense fallback={<PageLoading />}>
           <Routes>
+            {import.meta.env.DEV && (
+              <Route path="/__preview" element={<Layout />}>
+                <Route path="home" element={<Home previewData={HOME_PREVIEW_DATA} />} />
+                <Route path="calendar" element={<Calendar previewData={CALENDAR_PREVIEW_DATA} />} />
+              </Route>
+            )}
             <Route
               path="/login"
               element={
@@ -115,6 +145,7 @@ export default function App() {
               <Route path="memos" element={<Memos />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="weekly" element={<WeeklySummaries />} />
+              <Route path="reflections" element={<Reflections />} />
               <Route path="settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Route>

@@ -34,6 +34,13 @@ self.addEventListener('fetch', (event) => {
   
   // 只处理 GET 请求
   if (request.method !== 'GET') return
+
+  // Same-origin /api is a live Supabase proxy. Never cache user-specific data
+  // or the push configuration response in the static asset cache.
+  if (new URL(request.url).pathname.startsWith('/api/')) {
+    event.respondWith(fetch(request))
+    return
+  }
   
   // Supabase API 请求不缓存（需要实时数据）
   if (request.url.includes('supabase.co')) {
@@ -112,4 +119,45 @@ self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') {
     self.skipWaiting()
   }
+})
+
+// iPhone 主屏幕网页应用收到 Web Push 时必须展示可见通知。
+self.addEventListener('push', (event) => {
+  let payload = {}
+  try {
+    payload = event.data?.json() || {}
+  } catch {
+    payload = { body: event.data?.text() || '' }
+  }
+  const title = typeof payload.title === 'string' ? payload.title : 'LOHQ 提醒'
+  const body = typeof payload.body === 'string' ? payload.body : ''
+  let url = '/notifications'
+  try {
+    const target = new URL(payload.url || url, self.location.origin)
+    if (target.origin === self.location.origin) url = target.pathname + target.search + target.hash
+  } catch {
+    // Never follow an invalid or cross-origin notification URL.
+  }
+  event.waitUntil(self.registration.showNotification(title, {
+    body,
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: typeof payload.tag === 'string' ? payload.tag : undefined,
+    data: { url }
+  }))
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const path = event.notification.data?.url || '/notifications'
+  const target = new URL(path, self.location.origin)
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    const client = windows.find((item) => new URL(item.url).origin === self.location.origin)
+    if (client) {
+      await client.navigate(target.href)
+      return client.focus()
+    }
+    return self.clients.openWindow(target.href)
+  })())
 })

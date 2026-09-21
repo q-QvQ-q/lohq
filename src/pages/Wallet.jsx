@@ -4,14 +4,15 @@ import { supabase } from '../supabase/client.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useDataCache } from '../contexts/DataCacheContext.jsx'
 import { formatDateShort } from '../utils/dateUtils.js'
+import Icon from '../components/Icon.jsx'
 
 const CATEGORIES = {
-  food: { label: '餐饮', emoji: '🍜' },
-  transport: { label: '交通', emoji: '🚗' },
-  entertainment: { label: '娱乐', emoji: '🎮' },
-  shopping: { label: '购物', emoji: '🛍️' },
-  accommodation: { label: '住宿', emoji: '🏠' },
-  other: { label: '其他', emoji: '📦' }
+  food: { label: '餐饮', icon: 'tag' },
+  transport: { label: '交通', icon: 'tag' },
+  entertainment: { label: '娱乐', icon: 'tag' },
+  shopping: { label: '购物', icon: 'tag' },
+  accommodation: { label: '住宿', icon: 'home' },
+  other: { label: '其他', icon: 'tag' }
 }
 
 const CATEGORY_COLORS = {
@@ -365,7 +366,7 @@ export default function Wallet() {
           <span>←</span> 返回
         </button>
         <h1 className="page-title" style={{ marginBottom: 0 }}>
-          <span>💰</span> 恋爱账本
+          <Icon name="wallet" size={21} /> 恋爱账本
         </h1>
         <div style={{ width: '50px' }}></div>
       </div>
@@ -387,7 +388,7 @@ export default function Wallet() {
           displayWallets.map(wallet => (
             <div key={wallet.id} className="card text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <span className="text-xl">{genderOf(wallet.user_id) === 'female' ? '👧' : '👦'}</span>
+                <Icon name="user" size={19} />
                 <span className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>
                   {wallet.user_id === profile?.id ? '我的' : `${nameOf(wallet.user_id)}的`}
                 </span>
@@ -415,7 +416,7 @@ export default function Wallet() {
         {!walletsLoading && profile?.partner_id && (
           <div className="card text-center col-span-2" style={{ borderColor: 'var(--color-primary)', borderWidth: '1px' }}>
             <div className="flex items-center justify-center gap-2 mb-2">
-              <span className="text-xl">🏦</span>
+              <Icon name="wallet" size={19} />
               <span className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>我们共同的</span>
             </div>
             <p className="text-3xl font-bold" style={{ color: 'var(--color-primary-dark)' }}>
@@ -459,7 +460,7 @@ export default function Wallet() {
             color: 'var(--color-text)'
           }}
         >
-          💸 支出
+          支出
         </button>
         <button
           onClick={() => setActiveTab('rewards')}
@@ -471,7 +472,7 @@ export default function Wallet() {
             color: 'var(--color-text)'
           }}
         >
-          🎁 奖惩
+          奖惩
         </button>
         <button
           onClick={() => setActiveTab('stats')}
@@ -483,7 +484,7 @@ export default function Wallet() {
             color: 'var(--color-text)'
           }}
         >
-          📊 统计
+          统计
         </button>
       </div>
 
@@ -510,7 +511,7 @@ export default function Wallet() {
 
           {sharedTransactions.length > 0 && (
             <div className="card mb-3">
-              <h3 className="font-bold mb-2 text-sm" style={{ color: 'var(--color-text)' }}>🏦 共同账本最近流水</h3>
+              <h3 className="font-bold mb-2 text-sm" style={{ color: 'var(--color-text)' }}>共同账本最近流水</h3>
               <div className="space-y-2">
                 {sharedTransactions.slice(0, 6).map(transaction => (
                   <div key={transaction.id} className="flex items-center justify-between text-xs">
@@ -552,7 +553,7 @@ export default function Wallet() {
             </div>
           ) : expenses.length === 0 ? (
             <div className="card text-center py-8">
-              <span className="text-3xl block mb-2">💰</span>
+              <Icon name="wallet" size={25} className="mx-auto mb-2" />
               <p style={{ color: 'var(--color-text-light)' }}>还没有支出记录</p>
             </div>
           ) : (
@@ -563,7 +564,7 @@ export default function Wallet() {
                   <div key={expense.id} className="card card-hover">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-2xl">{cat.emoji}</span>
+                        <Icon name={cat.icon} size={20} />
                         <div>
                           <p className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>
                             {expense.note || cat.label}
@@ -595,7 +596,7 @@ export default function Wallet() {
               className="card text-center py-3 hover:shadow-md transition-shadow"
               style={{ borderColor: '#E74C3C', borderWidth: '1px' }}
             >
-              <span className="text-2xl block">💢</span>
+              <Icon name="circle" size={20} />
               <span className="text-xs font-bold" style={{ color: '#E74C3C' }}>记对方罚款</span>
             </button>
             <button
@@ -603,16 +604,16 @@ export default function Wallet() {
               className="card text-center py-3 hover:shadow-md transition-shadow"
               style={{ borderColor: 'var(--color-primary)', borderWidth: '1px' }}
             >
-              <span className="text-2xl block">🎁</span>
+              <Icon name="gift" size={20} />
               <span className="text-xs font-bold" style={{ color: 'var(--color-primary-dark)' }}>奖励对方</span>
             </button>
           </div>
 
           {/* Fines Section */}
-          <h3 className="font-bold mb-2 text-sm" style={{ color: 'var(--color-text)' }}>💢 罚款记录</h3>
+          <h3 className="font-bold mb-2 text-sm" style={{ color: 'var(--color-text)' }}>罚款记录</h3>
           {fines.length === 0 ? (
             <div className="card text-center py-6 mb-3">
-              <span className="text-2xl block mb-1">😊</span>
+              <Icon name="check" size={21} className="mx-auto mb-1" />
               <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>还没有罚款记录</p>
             </div>
           ) : (
@@ -621,7 +622,7 @@ export default function Wallet() {
                 <div key={tx.id} className="card" style={{ borderLeft: '4px solid #E74C3C' }}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span>💢</span>
+                      <Icon name="circle" size={17} />
                       <div>
                         <p className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>
                           {nameOf(tx.from_user_id)} 被罚
@@ -642,10 +643,10 @@ export default function Wallet() {
           )}
 
           {/* Rewards Section */}
-          <h3 className="font-bold mb-2 text-sm" style={{ color: 'var(--color-text)' }}>🎁 奖励记录</h3>
+          <h3 className="font-bold mb-2 text-sm" style={{ color: 'var(--color-text)' }}>奖励记录</h3>
           {rewards.length === 0 ? (
             <div className="card text-center py-6">
-              <span className="text-2xl block mb-1">✨</span>
+              <Icon name="gift" size={21} className="mx-auto mb-1" />
               <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>还没有奖励记录</p>
             </div>
           ) : (
@@ -654,7 +655,7 @@ export default function Wallet() {
                 <div key={tx.id} className="card" style={{ borderLeft: '4px solid var(--color-primary)' }}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span>🎁</span>
+                      <Icon name="gift" size={17} />
                       <div>
                         <p className="font-bold text-sm" style={{ color: 'var(--color-text)' }}>
                           {nameOf(tx.to_user_id)} 获得奖励
@@ -682,11 +683,11 @@ export default function Wallet() {
           {/* Expense Category Breakdown */}
           <div className="card">
             <h3 className="font-bold mb-3 text-sm flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
-              <span>📊</span> 支出分类占比
+              <Icon name="chart" size={17} /> 支出分类占比
             </h3>
             {categoryStats.length === 0 ? (
               <div className="text-center py-4">
-                <span className="text-2xl block mb-1">📈</span>
+                <Icon name="chart" size={21} className="mx-auto mb-1" />
                 <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>还没有支出数据</p>
               </div>
             ) : (
@@ -695,7 +696,7 @@ export default function Wallet() {
                   <div key={s.cat}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-bold flex items-center gap-1" style={{ color: 'var(--color-text)' }}>
-                        <span>{s.emoji}</span> {s.label}
+                        <Icon name={s.icon} size={14} /> {s.label}
                       </span>
                       <span className="text-xs font-bold" style={{ color: 'var(--color-primary-dark)' }}>
                         ¥{s.amount.toFixed(2)} ({s.percentage}%)
@@ -720,7 +721,7 @@ export default function Wallet() {
           {/* Fine Statistics */}
           <div className="card">
             <h3 className="font-bold mb-3 text-sm flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
-              <span>💢</span> 罚款统计
+              <Icon name="chart" size={17} /> 罚款统计
             </h3>
             <div className="grid grid-cols-3 gap-2 mb-4">
               <div className="text-center p-2 rounded-xl" style={{ backgroundColor: 'rgba(231, 76, 60, 0.1)' }}>
@@ -753,7 +754,7 @@ export default function Wallet() {
                            style={{ backgroundColor: 'rgba(231, 76, 60, 0.08)' }}>
                         <div className="flex items-center gap-2">
                           <span className="text-sm">
-                            {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                            {idx + 1}
                           </span>
                           <span className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>{name}</span>
                         </div>
@@ -788,7 +789,7 @@ export default function Wallet() {
                     .map(([reason, amount], idx) => (
                       <div key={idx} className="flex items-center justify-between text-xs p-1.5 rounded"
                            style={{ backgroundColor: 'rgba(231, 76, 60, 0.05)' }}>
-                        <span style={{ color: 'var(--color-text)' }}>💢 {reason}</span>
+                        <span style={{ color: 'var(--color-text)' }}>{reason}</span>
                         <span className="font-bold" style={{ color: '#E74C3C' }}>¥{amount.toFixed(2)}</span>
                       </div>
                     ))}
@@ -859,7 +860,7 @@ function ExpenseModal({ wallets, sharedWallet, newExpense, setNewExpense, onClos
          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
       <div className="card w-full max-w-md">
         <h3 className="font-bold mb-4" style={{ color: 'var(--color-text)' }}>
-          💸 记一笔支出
+          记一笔支出
         </h3>
         <div className="space-y-3">
           <input
@@ -876,7 +877,7 @@ function ExpenseModal({ wallets, sharedWallet, newExpense, setNewExpense, onClos
             className="input-field"
           >
             {Object.entries(CATEGORIES).map(([key, val]) => (
-              <option key={key} value={key}>{val.emoji} {val.label}</option>
+              <option key={key} value={key}>{val.label}</option>
             ))}
           </select>
           <input
@@ -895,7 +896,7 @@ function ExpenseModal({ wallets, sharedWallet, newExpense, setNewExpense, onClos
             {wallets.map(w => (
               <option key={w.id} value={w.user_id}>{nameOf(w.user_id)}</option>
             ))}
-            {sharedWallet && <option value="shared">🏦 我们共同的</option>}
+            {sharedWallet && <option value="shared">我们共同的</option>}
           </select>
           <input
             type="date"
@@ -921,7 +922,7 @@ function FineModal({ partnerName, partnerBalance, newFine, setNewFine, onClose, 
          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
       <div className="card w-full max-w-md">
         <h3 className="font-bold mb-4" style={{ color: 'var(--color-text)' }}>
-          💢 记一笔罚款
+          记一笔罚款
         </h3>
         <div className="space-y-3">
           <div className="p-3 rounded-xl text-sm" style={{ backgroundColor: 'rgba(231, 76, 60, 0.08)', color: 'var(--color-text)' }}>
@@ -949,7 +950,7 @@ function FineModal({ partnerName, partnerBalance, newFine, setNewFine, onClose, 
             className="input-field"
           />
           <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
-            💡 罚款只从对方账本扣除，不会转入你的账本
+            罚款只从对方账本扣除，不会转入你的账本
           </p>
         </div>
         <div className="flex gap-2 mt-4">
@@ -969,7 +970,7 @@ function RewardModal({ partnerName, partnerBalance, newReward, setNewReward, onC
          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
       <div className="card w-full max-w-md">
         <h3 className="font-bold mb-4" style={{ color: 'var(--color-text)' }}>
-          🎁 给一笔奖励
+          给一笔奖励
         </h3>
         <div className="space-y-3">
           <div className="p-3 rounded-xl text-sm" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-text)' }}>
@@ -997,7 +998,7 @@ function RewardModal({ partnerName, partnerBalance, newReward, setNewReward, onC
             className="input-field"
           />
           <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
-            💡 奖励将直接加到对方钱包余额
+            奖励将直接加到对方钱包余额
           </p>
         </div>
         <div className="flex gap-2 mt-4">
@@ -1016,7 +1017,7 @@ function DepositModal({ newDeposit, setNewDeposit, onClose, onSubmit, submitting
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
       <div className="card w-full max-w-md">
-        <h3 className="font-bold mb-4" style={{ color: 'var(--color-text)' }}>🏦 存入共同账户</h3>
+        <h3 className="font-bold mb-4" style={{ color: 'var(--color-text)' }}>存入共同账户</h3>
         <div className="space-y-3">
           <input
             type="number"
@@ -1042,7 +1043,7 @@ function DepositModal({ newDeposit, setNewDeposit, onClose, onSubmit, submitting
             className="input-field"
           />
           <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
-            💡 双方都能看到这笔存入和更新后的共同余额
+            双方都能看到这笔存入和更新后的共同余额
           </p>
         </div>
         <div className="flex gap-2 mt-4">

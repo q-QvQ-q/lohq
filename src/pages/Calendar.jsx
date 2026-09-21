@@ -1,42 +1,66 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase/client.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useDataCache } from '../contexts/DataCacheContext.jsx'
 import { formatDate, getAnniversaryTypeLabel } from '../utils/dateUtils.js'
 import { expandTodosForMonth, RECURRENCE_LABELS } from '../utils/todoRecurrence.js'
+import Icon from '../components/Icon.jsx'
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
+const emptyTodo = () => ({ content: '', remind_enabled: false, remind_time: '09:00', recurrence: 'none' })
+const emptyAnniversary = () => ({ title: '', date: '', type: 'birthday', is_repeat_yearly: true, remind_enabled: false, remind_time: '09:00' })
+const needsReminder = (item) => item.remind_enabled ?? item.priority === 'high'
 
-const MOODS = {
-  happy: { emoji: '😊', label: '开心' },
-  sweet: { emoji: '🥰', label: '甜蜜' },
-  normal: { emoji: '😐', label: '一般' },
-  sad: { emoji: '😢', label: '难过' },
-  angry: { emoji: '😤', label: '生气' }
+function dateFromQuery(search) {
+  const value = new URLSearchParams(search).get('date')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return null
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null
 }
 
-export default function Calendar() {
+function tabFromQuery(search) {
+  const value = new URLSearchParams(search).get('tab')
+  return ['all', 'diary', 'todo', 'anniversary'].includes(value) ? value : 'all'
+}
+
+const MOODS = {
+  happy: { icon: 'sun', label: '开心' },
+  sweet: { icon: 'heart', label: '甜蜜' },
+  normal: { icon: 'circle', label: '一般' },
+  sad: { icon: 'moon', label: '难过' },
+  angry: { icon: 'x', label: '生气' }
+}
+
+const anniversaryClass = (type, isToday = false) => `anniversary-entry anniversary-entry--${type || 'other'}${isToday ? ' is-today' : ''}`
+
+export default function Calendar({ previewData = null }) {
   const navigate = useNavigate()
+  const location = useLocation()
+  const targetTodoId = new URLSearchParams(location.search).get('todo')
+  const targetAnniversaryId = new URLSearchParams(location.search).get('anniversary')
   const { profile } = useAuth()
   const { fetchWithCache, invalidateByPrefix, profileMap } = useDataCache()
   
   const nameOf = (id, fallback = '宝宝') => id ? (profileMap[id]?.nickname || fallback) : fallback
   
-  const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [selectedDate, setSelectedDate] = useState(new Date())
-  const [diaries, setDiaries] = useState([])
-  const [todos, setTodos] = useState([])
-  const [anniversaries, setAnniversaries] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('all')
+  const [currentMonth, setCurrentMonth] = useState(() => dateFromQuery(location.search) || new Date())
+  const [selectedDate, setSelectedDate] = useState(() => dateFromQuery(location.search) || new Date())
+  const [diaries, setDiaries] = useState(previewData?.diaries || [])
+  const [todos, setTodos] = useState(previewData?.todos || [])
+  const [anniversaries, setAnniversaries] = useState(previewData?.anniversaries || [])
+  const [loading, setLoading] = useState(!previewData)
+  const [activeTab, setActiveTab] = useState(() => tabFromQuery(location.search))
   
   const [showTodoModal, setShowTodoModal] = useState(false)
   const [showAnniversaryModal, setShowAnniversaryModal] = useState(false)
   const [showDiaryModal, setShowDiaryModal] = useState(false)
+  const [editingTodo, setEditingTodo] = useState(null)
+  const [editingAnniversary, setEditingAnniversary] = useState(null)
   
-  const [newTodo, setNewTodo] = useState({ content: '', priority: 'normal', recurrence: 'none' })
-  const [newAnniversary, setNewAnniversary] = useState({ title: '', date: '', type: 'birthday', is_repeat_yearly: true })
+  const [newTodo, setNewTodo] = useState(emptyTodo)
+  const [newAnniversary, setNewAnniversary] = useState(emptyAnniversary)
   const [newDiary, setNewDiary] = useState({ mood: 'normal', content: '' })
 
   const year = currentMonth.getFullYear()
@@ -124,8 +148,18 @@ export default function Calendar() {
   }, [getDateKey])
 
   useEffect(() => {
+    if (previewData) return
     loadData()
-  }, [currentMonth])
+  }, [currentMonth, previewData])
+
+  useEffect(() => {
+    const date = dateFromQuery(location.search)
+    if (date) {
+      setCurrentMonth(date)
+      setSelectedDate(date)
+      setActiveTab('all')
+    }
+  }, [location.search])
 
   async function loadData() {
     if (!profile?.id) {
@@ -195,6 +229,30 @@ export default function Calendar() {
     setSelectedDate(target)
   }
 
+  function openTodoModal(todo = null) {
+    setEditingTodo(todo)
+    setNewTodo(todo ? {
+      content: todo.content,
+      remind_enabled: needsReminder(todo),
+      remind_time: String(todo.remind_time || '09:00').slice(0, 5),
+      recurrence: todo.recurrence || 'none'
+    } : emptyTodo())
+    setShowTodoModal(true)
+  }
+
+  function openAnniversaryModal(anniversary = null) {
+    setEditingAnniversary(anniversary)
+    setNewAnniversary(anniversary ? {
+      title: anniversary.title,
+      date: anniversary.date,
+      type: anniversary.type,
+      is_repeat_yearly: anniversary.is_repeat_yearly,
+      remind_enabled: anniversary.remind_enabled || false,
+      remind_time: String(anniversary.remind_time || '09:00').slice(0, 5)
+    } : emptyAnniversary())
+    setShowAnniversaryModal(true)
+  }
+
   async function toggleTodo(todo) {
     try {
       if (!todo) return
@@ -227,19 +285,25 @@ export default function Calendar() {
       alert('请输入待办内容')
       return
     }
+    if (newTodo.remind_enabled && !/^([01]\d|2[0-3]):[0-5]\d$/.test(newTodo.remind_time)) {
+      alert('请选择有效的提醒时间')
+      return
+    }
     try {
       const dateStr = getDateKey(selectedDate)
-      const { error } = await supabase
-        .from('todos')
-        .insert({
-          content: newTodo.content.trim(),
-          priority: newTodo.priority,
-          recurrence: newTodo.recurrence,
-          due_date: dateStr,
-          created_by: profile.id
-        })
+      const values = {
+        content: newTodo.content.trim(),
+        priority: newTodo.remind_enabled ? 'high' : 'normal',
+        remind_enabled: newTodo.remind_enabled,
+        remind_time: newTodo.remind_time,
+        recurrence: newTodo.recurrence
+      }
+      const { error } = editingTodo
+        ? await supabase.from('todos').update(values).eq('id', editingTodo.id)
+        : await supabase.from('todos').insert({ ...values, due_date: dateStr, created_by: profile.id })
       if (error) throw error
-      setNewTodo({ content: '', priority: 'normal', recurrence: 'none' })
+      setNewTodo(emptyTodo())
+      setEditingTodo(null)
       setShowTodoModal(false)
       invalidateByPrefix('todos')
       await loadData()
@@ -249,22 +313,31 @@ export default function Calendar() {
   }
 
   async function addAnniversary() {
-    if (!newAnniversary.title.trim() || !newAnniversary.date) {
+    const anniversaryDate = newAnniversary.date || getDateKey(selectedDate)
+    if (!newAnniversary.title.trim() || !anniversaryDate) {
       alert('请填写完整信息')
       return
     }
+    if (newAnniversary.remind_enabled && !/^([01]\d|2[0-3]):[0-5]\d$/.test(newAnniversary.remind_time)) {
+      alert('请选择有效的提醒时间')
+      return
+    }
     try {
-      const { error } = await supabase
-        .from('anniversaries')
-        .insert({
-          title: newAnniversary.title.trim(),
-          date: newAnniversary.date,
-          type: newAnniversary.type,
-          is_repeat_yearly: newAnniversary.is_repeat_yearly,
-          created_by: profile.id
-        })
+      const values = {
+        title: newAnniversary.title.trim(),
+        date: anniversaryDate,
+        type: newAnniversary.type,
+        is_repeat_yearly: newAnniversary.is_repeat_yearly,
+        remind_enabled: newAnniversary.remind_enabled,
+        remind_time: newAnniversary.remind_time,
+        ...(!editingAnniversary?.created_by ? { created_by: profile.id } : {})
+      }
+      const { error } = editingAnniversary
+        ? await supabase.from('anniversaries').update(values).eq('id', editingAnniversary.id)
+        : await supabase.from('anniversaries').insert({ ...values, created_by: profile.id })
       if (error) throw error
-      setNewAnniversary({ title: '', date: '', type: 'birthday', is_repeat_yearly: true })
+      setNewAnniversary(emptyAnniversary())
+      setEditingAnniversary(null)
       setShowAnniversaryModal(false)
       invalidateByPrefix('anniversaries')
       await loadData()
@@ -351,11 +424,10 @@ export default function Calendar() {
   const allAnniversaries = anniversaries
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {loading && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs flex items-center gap-2"
-             style={{ backgroundColor: 'var(--color-primary)', color: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-          <span className="animate-spin">🐱</span> 加载中...
+        <div className="glass-pill fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 text-xs flex items-center gap-2">
+          <Icon name="calendar" size={16} /> 加载中...
         </div>
       )}
       {/* Header */}
@@ -365,24 +437,24 @@ export default function Calendar() {
           className="flex items-center gap-1 text-sm font-bold hover:opacity-70 transition-opacity"
           style={{ color: 'var(--color-text)' }}
         >
-          <span>←</span> 返回
+          <Icon name="chevronLeft" size={17} /> 返回
         </button>
         <h1 className="page-title" style={{ marginBottom: 0 }}>
-          <span>📅</span> 日历
+          <Icon name="calendar" size={22} /> 日历
         </h1>
         <div style={{ width: '50px' }}></div>
       </div>
 
       {/* Month Navigation */}
       <div className="flex items-center justify-between card">
-        <button onClick={prevMonth} className="text-xl hover:opacity-70 px-2" style={{ color: 'var(--color-text)' }}>
-          ←
+        <button onClick={prevMonth} className="icon-button" aria-label="上个月">
+          <Icon name="chevronLeft" size={19} />
         </button>
         <h2 className="text-lg font-bold" style={{ color: 'var(--color-text)' }}>
           {currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月
         </h2>
-        <button onClick={nextMonth} className="text-xl hover:opacity-70 px-2" style={{ color: 'var(--color-text)' }}>
-          →
+        <button onClick={nextMonth} className="icon-button" aria-label="下个月">
+          <Icon name="chevronRight" size={19} />
         </button>
       </div>
 
@@ -408,31 +480,25 @@ export default function Calendar() {
           const hasDiary = dayDiaries.length > 0
           const hasTodo = dayTodos.length > 0
           const hasAnniversary = dayAnniversaries.length > 0
+          const diaryMood = hasDiary ? (MOODS[dayDiaries[dayDiaries.length - 1]?.mood] || MOODS.normal) : null
           const isSelected = getDateKey(selectedDate) === getDateKey(date)
+          const isCurrentDay = isToday(date)
           
           return (
             <button
               key={idx}
               onClick={() => setSelectedDate(date)}
-              className={`aspect-square p-1 rounded-lg flex flex-col items-center justify-center relative transition-all ${
-                isSelected ? 'ring-2' : 'hover:opacity-80'
-              }`}
-              style={{
-                backgroundColor: isSelected ? 'var(--color-primary-light)' : 'rgba(212, 165, 165, 0.1)',
-                color: 'var(--color-text)',
-                borderColor: isSelected ? 'var(--color-primary)' : 'transparent',
-                borderWidth: isSelected ? '2px' : '0',
-                opacity: isSelected ? 1 : 0.8
-              }}
+              className={`calendar-day aspect-square p-1 flex flex-col items-center justify-center relative${isCurrentDay ? ' is-today' : ''}`}
+              aria-selected={isSelected}
+              aria-label={`${date.getMonth() + 1}月${date.getDate()}日${isCurrentDay ? '，今天' : ''}${hasAnniversary ? '，有纪念日' : ''}`}
+              style={{ color: 'var(--color-text)' }}
             >
-              <span className="text-sm font-bold" 
-                    style={{ color: isToday(date) ? 'var(--color-primary-dark)' : 'var(--color-text)' }}>
+              <span className={`calendar-day__date${hasAnniversary ? ' has-anniversary' : ''}`}>
                 {date.getDate()}
               </span>
-              <div className="flex gap-0.5 mt-0.5">
-                {hasAnniversary && <span className="text-xs">🎂</span>}
-                {hasDiary && <span className="text-xs">📔</span>}
-                {hasTodo && <span className="text-xs">✅</span>}
+              <div className="calendar-day__markers" aria-hidden="true">
+                {hasDiary && <span className="calendar-mood"><Icon name={diaryMood.icon} size={11} /></span>}
+                {hasTodo && <span className="calendar-dot" />}
               </div>
             </button>
           )
@@ -440,79 +506,35 @@ export default function Calendar() {
       </div>
 
       {/* Tab Buttons */}
-      <div className="flex gap-1 p-1 rounded-xl" style={{ backgroundColor: 'var(--color-primary-light)' }}>
-        <button
-          onClick={() => setActiveTab('all')}
-          className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
-            activeTab === 'all' ? '' : 'opacity-60'
-          }`}
-          style={{
-            backgroundColor: activeTab === 'all' ? 'white' : 'transparent',
-            color: 'var(--color-text)'
-          }}
-        >
-          📋 全部
-        </button>
-        <button
-          onClick={() => setActiveTab('diary')}
-          className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
-            activeTab === 'diary' ? '' : 'opacity-60'
-          }`}
-          style={{
-            backgroundColor: activeTab === 'diary' ? 'white' : 'transparent',
-            color: 'var(--color-text)'
-          }}
-        >
-          📔 日记
-        </button>
-        <button
-          onClick={() => setActiveTab('todo')}
-          className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
-            activeTab === 'todo' ? '' : 'opacity-60'
-          }`}
-          style={{
-            backgroundColor: activeTab === 'todo' ? 'white' : 'transparent',
-            color: 'var(--color-text)'
-          }}
-        >
-          ✅ 待办
-        </button>
-        <button
-          onClick={() => setActiveTab('anniversary')}
-          className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
-            activeTab === 'anniversary' ? '' : 'opacity-60'
-          }`}
-          style={{
-            backgroundColor: activeTab === 'anniversary' ? 'white' : 'transparent',
-            color: 'var(--color-text)'
-          }}
-        >
-          🎂 纪念
-        </button>
+      <div className="segmented-control" role="tablist" aria-label="日历内容">
+        <button role="tab" aria-selected={activeTab === 'all'} onClick={() => setActiveTab('all')}><Icon name="list" size={16} />全部</button>
+        <button role="tab" aria-selected={activeTab === 'diary'} onClick={() => setActiveTab('diary')}><Icon name="note" size={16} />日记</button>
+        <button role="tab" aria-selected={activeTab === 'todo'} onClick={() => setActiveTab('todo')}><Icon name="check" size={16} />待办</button>
+        <button role="tab" aria-selected={activeTab === 'anniversary'} onClick={() => setActiveTab('anniversary')}><Icon name="heart" size={16} />纪念</button>
       </div>
 
       {/* Add Buttons */}
       <div className="grid grid-cols-3 gap-2">
         <button
           onClick={() => setShowDiaryModal(true)}
-          className="card text-center py-3 hover:shadow-md transition-shadow"
+          className="glass-button flex-col py-3"
         >
-          <span className="text-xl block">✏️</span>
-          <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>写日记</span>
+          <Icon name="pencil" size={18} />
+          <span className="text-xs">写日记</span>
         </button>
         <button
-          onClick={() => setShowTodoModal(true)}
-          className="card text-center py-3 hover:shadow-md transition-shadow"
+          onClick={() => openTodoModal()}
+          className="btn-primary flex-col py-3"
         >
-          <span className="text-xl block">➕</span>
-          <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>加待办</span>
+          <Icon name="plus" size={18} />
+          <span className="text-xs">加待办</span>
         </button>
         <button
-          onClick={() => setShowAnniversaryModal(true)}
-          className="card text-center py-3 hover:shadow-md transition-shadow"
+          onClick={() => openAnniversaryModal()}
+          className="glass-button flex-col py-3"
         >
-          <span className="text-xl block">🎂</span>
-          <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>纪念日</span>
+          <Icon name="calendar" size={18} />
+          <span className="text-xs">纪念日</span>
         </button>
       </div>
 
@@ -534,16 +556,19 @@ export default function Calendar() {
             {selectedAnniversaries.length > 0 && (
               <div className="mb-3">
                 <p className="text-xs font-bold mb-1" style={{ color: 'var(--color-text-light)' }}>
-                  🎂 纪念日
+                  <Icon name="calendar" size={15} className="inline mr-1" />纪念日
                 </p>
                 {selectedAnniversaries.map(a => (
-                  <div key={a.id} className="flex items-center gap-2 p-2 rounded-lg mb-1" 
-                       style={{ backgroundColor: 'rgba(255, 200, 200, 0.3)' }}>
-                    <span>🎂</span>
+                  <div key={a.id} className={`${anniversaryClass(a.type)} mb-1`}
+                       style={{ outline: a.id === targetAnniversaryId ? '2px solid var(--color-primary)' : undefined }}>
+                    <span className="anniversary-entry__icon"><Icon name={a.type === 'love' ? 'heart' : a.type === 'birthday' ? 'gift' : 'calendar'} size={17} /></span>
                     <span className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>{a.title}</span>
-                    <span className="text-xs ml-auto" style={{ color: 'var(--color-text-light)' }}>
+                    {a.remind_enabled && <span className="meta-chip ml-auto"><Icon name="bell" size={13} />{String(a.remind_time || '09:00').slice(0, 5)}</span>}
+                    <span className="anniversary-entry__type">
                       {getAnniversaryTypeLabel(a.type)}
                     </span>
+                    <button type="button" onClick={() => openAnniversaryModal(a)} aria-label={`编辑纪念日：${a.title}`}
+                      className="text-xs hover:opacity-70" style={{ color: 'var(--color-primary-dark)' }}>编辑</button>
                   </div>
                 ))}
               </div>
@@ -553,7 +578,7 @@ export default function Calendar() {
             {selectedDiaries.length > 0 && (
               <div className="mb-3">
                 <p className="text-xs font-bold mb-1" style={{ color: 'var(--color-text-light)' }}>
-                  📔 日记
+                  <Icon name="note" size={15} className="inline mr-1" />日记
                 </p>
                 {selectedDiaries.map(d => {
                   const mood = MOODS[d.mood] || MOODS.normal
@@ -561,7 +586,7 @@ export default function Calendar() {
                     <div key={d.id} className="p-2 rounded-lg mb-2 border-l-4 relative" 
                          style={{ borderColor: 'var(--color-primary-dark)', backgroundColor: 'var(--color-primary-light)' }}>
                       <div className="flex items-center gap-2 mb-1">
-                        <span>{mood.emoji}</span>
+                        <Icon name={mood.icon} size={16} />
                         <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>
                           {nameOf(d.author_id)}
                         </span>
@@ -570,7 +595,7 @@ export default function Calendar() {
                           className="absolute top-1 right-1 text-xs hover:opacity-70"
                           style={{ color: 'var(--color-text-light)' }}
                         >
-                          ✕
+                          <Icon name="x" size={15} />
                         </button>
                       </div>
                       <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--color-text)' }}>
@@ -586,43 +611,18 @@ export default function Calendar() {
             {selectedTodos.length > 0 && (
               <div>
                 <p className="text-xs font-bold mb-1" style={{ color: 'var(--color-text-light)' }}>
-                  ✅ 待办
+                  <Icon name="check" size={15} className="inline mr-1" />待办
                 </p>
-                {selectedTodos.map(t => (
-                  <div key={`${t.id}-${t.occurrence_date}`} className="flex items-center gap-2 p-2 rounded-lg mb-1"
-                       style={{ backgroundColor: t.is_completed ? 'var(--color-primary-light)' : 'white', border: '1px solid var(--color-primary-light)' }}>
-                    <input
-                      type="checkbox"
-                      checked={t.is_completed}
-                      onChange={() => toggleTodo(t)}
-                      className="w-4 h-4"
-                    />
-                    <span className={`flex-1 text-sm ${t.is_completed ? 'line-through' : ''}`} 
-                          style={{ color: t.is_completed ? 'var(--color-text-light)' : 'var(--color-text)' }}>
-                      {t.content}
-                    </span>
-                    {t.recurrence && t.recurrence !== 'none' && <span className="text-xs" style={{ color: 'var(--color-text-light)' }}>{RECURRENCE_LABELS[t.recurrence]}</span>}
-                    {t.priority === 'high' && (
-                      <span className="text-xs px-1 rounded" style={{ backgroundColor: '#FFE0E0', color: '#E74C3C' }}>
-                        重要
-                      </span>
-                    )}
-                    <button
-                      onClick={() => deleteTodo(t.id)}
-                      className="text-xs hover:opacity-70"
-                      style={{ color: 'var(--color-text-light)' }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                <div className="space-y-2">
+                  {selectedTodos.map(t => <TodoCard key={`${t.id}-${t.occurrence_date}`} todo={t} highlighted={t.id === targetTodoId} onToggle={toggleTodo} onEdit={openTodoModal} onDelete={deleteTodo} />)}
+                </div>
               </div>
             )}
 
             {/* Empty State */}
             {selectedAnniversaries.length === 0 && selectedDiaries.length === 0 && selectedTodos.length === 0 && (
               <div className="text-center py-4">
-                <span className="text-3xl block mb-2">🐱</span>
+                <Icon name="calendar" size={25} className="mx-auto mb-2" />
                 <p className="text-sm" style={{ color: 'var(--color-text-light)' }}>
                   这天还没有记录哦
                 </p>
@@ -639,7 +639,7 @@ export default function Calendar() {
           <>
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
-                📔 本月日记
+                <Icon name="note" size={17} className="inline mr-1" />本月日记
               </h3>
               <span className="text-xs" style={{ color: 'var(--color-text-light)' }}>
                 共 {monthDiaries.length} 篇
@@ -648,7 +648,7 @@ export default function Calendar() {
             
             {monthDiaries.length === 0 ? (
               <div className="text-center py-4">
-                <span className="text-3xl block mb-2">📔</span>
+                <Icon name="note" size={25} className="mx-auto mb-2" />
                 <p className="text-sm" style={{ color: 'var(--color-text-light)' }}>
                   本月还没有日记
                 </p>
@@ -662,19 +662,21 @@ export default function Calendar() {
                     <div key={d.id} className="p-2 rounded-lg border-l-4 relative" 
                          style={{ borderColor: 'var(--color-primary-dark)', backgroundColor: 'var(--color-primary-light)' }}>
                       <div className="flex items-center gap-2 mb-1">
-                        <span>{mood.emoji}</span>
+                        <Icon name={mood.icon} size={16} />
                         <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>
                           {nameOf(d.author_id)}
                         </span>
-                        <span className="text-xs ml-auto" style={{ color: 'var(--color-text-light)' }}>
+                        <span className="text-xs ml-auto mr-5" style={{ color: 'var(--color-text-light)' }}>
                           {dDate.getMonth() + 1}月{dDate.getDate()}日
                         </span>
                         <button
+                          type="button"
+                          aria-label="删除这篇日记"
                           onClick={() => deleteDiary(d.id)}
                           className="absolute top-1 right-1 text-xs hover:opacity-70"
                           style={{ color: 'var(--color-text-light)' }}
                         >
-                          ✕
+                          <Icon name="x" size={15} />
                         </button>
                       </div>
                       <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--color-text)' }}>
@@ -693,7 +695,7 @@ export default function Calendar() {
           <>
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
-                ✅ 待办事项
+                <Icon name="check" size={17} className="inline mr-1" />待办事项
               </h3>
               <span className="text-xs" style={{ color: 'var(--color-text-light)' }}>
                 共 {pendingTodos.length} 项未完成
@@ -702,46 +704,14 @@ export default function Calendar() {
             
             {pendingTodos.length === 0 ? (
               <div className="text-center py-4">
-                <span className="text-3xl block mb-2">🎉</span>
+                <Icon name="check" size={25} className="mx-auto mb-2" />
                 <p className="text-sm" style={{ color: 'var(--color-text-light)' }}>
                   太棒了！没有待办事项
                 </p>
               </div>
             ) : (
               <div className="space-y-2">
-                {pendingTodos.map(t => (
-                  <div key={`${t.id}-${t.occurrence_date}`} className="flex items-center gap-2 p-2 rounded-lg"
-                       style={{ backgroundColor: 'white', border: '1px solid var(--color-primary-light)' }}>
-                    <input
-                      type="checkbox"
-                      checked={t.is_completed}
-                      onChange={() => toggleTodo(t)}
-                      className="w-4 h-4"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm" style={{ color: 'var(--color-text)' }}>
-                        {t.content}
-                      </p>
-                      {t.due_date && (
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-light)' }}>
-                          📅 {t.occurrence_date} {t.recurrence && t.recurrence !== 'none' ? `· ${RECURRENCE_LABELS[t.recurrence]}` : ''}
-                        </p>
-                      )}
-                    </div>
-                    {t.priority === 'high' && (
-                      <span className="text-xs px-1 rounded" style={{ backgroundColor: '#FFE0E0', color: '#E74C3C' }}>
-                        重要
-                      </span>
-                    )}
-                    <button
-                      onClick={() => deleteTodo(t.id)}
-                      className="text-xs hover:opacity-70"
-                      style={{ color: 'var(--color-text-light)' }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                {pendingTodos.map(t => <TodoCard key={`${t.id}-${t.occurrence_date}`} todo={t} onToggle={toggleTodo} onEdit={openTodoModal} onDelete={deleteTodo} />)}
               </div>
             )}
           </>
@@ -752,7 +722,7 @@ export default function Calendar() {
           <>
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>
-                🎂 所有纪念日
+                <Icon name="calendar" size={17} className="inline mr-1" />所有纪念日
               </h3>
               <span className="text-xs" style={{ color: 'var(--color-text-light)' }}>
                 共 {allAnniversaries.length} 个
@@ -761,7 +731,7 @@ export default function Calendar() {
             
             {allAnniversaries.length === 0 ? (
               <div className="text-center py-4">
-                <span className="text-3xl block mb-2">🎂</span>
+                <Icon name="calendar" size={25} className="mx-auto mb-2" />
                 <p className="text-sm" style={{ color: 'var(--color-text-light)' }}>
                   还没有添加纪念日
                 </p>
@@ -773,25 +743,27 @@ export default function Calendar() {
                   const today = new Date()
                   const isToday = aDate.getMonth() === today.getMonth() && aDate.getDate() === today.getDate()
                   return (
-                    <div key={a.id} className="flex items-center gap-2 p-2 rounded-lg" 
-                         style={{ backgroundColor: isToday ? 'rgba(255, 200, 200, 0.3)' : 'white', border: '1px solid var(--color-primary-light)' }}>
-                      <span className="text-xl">🎂</span>
+                    <div key={a.id} className={anniversaryClass(a.type, isToday)}>
+                      <span className="anniversary-entry__icon"><Icon name={a.type === 'love' ? 'heart' : a.type === 'birthday' ? 'gift' : 'calendar'} size={18} /></span>
                       <div className="flex-1">
                         <p className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>
                           {a.title}
-                          {isToday && <span className="text-xs ml-1" style={{ color: '#E74C3C' }}>今天</span>}
+                          {isToday && <span className="anniversary-entry__today">今天</span>}
                         </p>
                         <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
                           {aDate.getFullYear()}年{aDate.getMonth() + 1}月{aDate.getDate()}日 · {getAnniversaryTypeLabel(a.type)}
                           {a.is_repeat_yearly && ' · 每年'}
+                          {a.remind_enabled && ` · ${String(a.remind_time || '09:00').slice(0, 5)} 提醒`}
                         </p>
                       </div>
+                      <button type="button" onClick={() => openAnniversaryModal(a)} aria-label={`编辑纪念日：${a.title}`}
+                        className="text-xs hover:opacity-70" style={{ color: 'var(--color-primary-dark)' }}>编辑</button>
                       <button
                         onClick={() => deleteAnniversary(a.id)}
                         className="text-xs hover:opacity-70"
                         style={{ color: 'var(--color-text-light)' }}
                       >
-                        ✕
+                        <Icon name="x" size={15} />
                       </button>
                     </div>
                   )
@@ -804,11 +776,10 @@ export default function Calendar() {
 
       {/* Add Diary Modal */}
       {showDiaryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-             style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="card w-full max-w-md">
+        <div className="modal-backdrop" role="presentation">
+          <div className="modal-surface" role="dialog" aria-modal="true" aria-label="写日记">
             <h3 className="font-bold mb-4" style={{ color: 'var(--color-text)' }}>
-              ✏️ 写日记
+              <Icon name="pencil" size={19} className="inline mr-1" />写日记
             </h3>
             <p className="text-xs mb-2" style={{ color: 'var(--color-text-light)' }}>
               {formatDate(selectedDate)}
@@ -827,7 +798,7 @@ export default function Calendar() {
                       borderColor: newDiary.mood === key ? 'var(--color-primary)' : 'transparent'
                     }}
                   >
-                    <span className="text-xl">{val.emoji}</span>
+                    <Icon name={val.icon} size={18} className="mx-auto" />
                     <span className="block text-xs">{val.label}</span>
                   </button>
                 ))}
@@ -860,14 +831,13 @@ export default function Calendar() {
 
       {/* Add Todo Modal */}
       {showTodoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-             style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="card w-full max-w-md">
-            <h3 className="font-bold mb-4" style={{ color: 'var(--color-text)' }}>
-              ✅ 添加待办
+        <div className="modal-backdrop" role="presentation">
+          <div className="modal-surface" role="dialog" aria-modal="true" aria-label={editingTodo ? '编辑待办' : '添加待办'}>
+            <h3 className="text-xl font-semibold mb-3 flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
+              <Icon name={editingTodo ? 'pencil' : 'plus'} size={20} /> {editingTodo ? '编辑待办' : '添加待办'}
             </h3>
             <p className="text-xs mb-2" style={{ color: 'var(--color-text-light)' }}>
-              {formatDate(selectedDate)}
+              {editingTodo ? `修改${editingTodo.recurrence !== 'none' ? '整个重复待办' : '待办'}的提醒设置` : formatDate(selectedDate)}
             </p>
             <div className="space-y-3">
               <input
@@ -878,28 +848,26 @@ export default function Calendar() {
                 className="input-field"
                 autoFocus
               />
-              <div className="flex gap-2">
+              <div className="segmented-control" role="group" aria-label="提醒设置">
                 <button
-                  onClick={() => setNewTodo({ ...newTodo, priority: 'normal' })}
-                  className={`flex-1 py-2 rounded-lg text-sm ${newTodo.priority === 'normal' ? 'font-bold' : ''}`}
-                  style={{
-                    backgroundColor: newTodo.priority === 'normal' ? 'var(--color-primary)' : 'var(--color-primary-light)',
-                    color: newTodo.priority === 'normal' ? 'white' : 'var(--color-text)'
-                  }}
+                  onClick={() => setNewTodo({ ...newTodo, remind_enabled: false })}
+                  aria-pressed={!newTodo.remind_enabled}
                 >
-                  一般
+                  <Icon name="circle" size={16} /> 不需要提醒
                 </button>
                 <button
-                  onClick={() => setNewTodo({ ...newTodo, priority: 'high' })}
-                  className={`flex-1 py-2 rounded-lg text-sm ${newTodo.priority === 'high' ? 'font-bold' : ''}`}
-                  style={{
-                    backgroundColor: newTodo.priority === 'high' ? '#E74C3C' : 'var(--color-primary-light)',
-                    color: newTodo.priority === 'high' ? 'white' : 'var(--color-text)'
-                  }}
+                  onClick={() => setNewTodo({ ...newTodo, remind_enabled: true })}
+                  aria-pressed={newTodo.remind_enabled}
                 >
-                  重要
+                  <Icon name="bell" size={16} /> 需要提醒
                 </button>
               </div>
+              {newTodo.remind_enabled && <label className="block text-sm" style={{ color: 'var(--color-text)' }}>
+                提醒时间（北京时间）
+                <input type="time" required value={newTodo.remind_time}
+                  onChange={(e) => setNewTodo({ ...newTodo, remind_time: e.target.value })}
+                  className="input-field mt-1" />
+              </label>}
               <label className="block text-sm" style={{ color: 'var(--color-text)' }}>
                 重复
                 <select value={newTodo.recurrence}
@@ -911,7 +879,7 @@ export default function Calendar() {
             </div>
             <div className="flex gap-2 mt-4">
               <button
-                onClick={() => setShowTodoModal(false)}
+                onClick={() => { setShowTodoModal(false); setEditingTodo(null) }}
                 className="btn-secondary flex-1"
               >
                 取消
@@ -920,7 +888,7 @@ export default function Calendar() {
                 onClick={addTodo}
                 className="btn-primary flex-1"
               >
-                添加
+                {editingTodo ? '保存' : '添加'}
               </button>
             </div>
           </div>
@@ -929,11 +897,10 @@ export default function Calendar() {
 
       {/* Add Anniversary Modal */}
       {showAnniversaryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-             style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="card w-full max-w-md">
+        <div className="modal-backdrop" role="presentation">
+          <div className="modal-surface" role="dialog" aria-modal="true" aria-label={editingAnniversary ? '编辑纪念日' : '添加纪念日'}>
             <h3 className="font-bold mb-4" style={{ color: 'var(--color-text)' }}>
-              🎂 添加纪念日
+              <Icon name="calendar" size={19} className="inline mr-1" />{editingAnniversary ? '编辑纪念日' : '添加纪念日'}
             </h3>
             <div className="space-y-3">
               <input
@@ -950,15 +917,26 @@ export default function Calendar() {
                 onChange={(e) => setNewAnniversary({ ...newAnniversary, date: e.target.value })}
                 className="input-field"
               />
+              <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text)' }}>
+                <input type="checkbox" checked={newAnniversary.remind_enabled}
+                  onChange={(e) => setNewAnniversary({ ...newAnniversary, remind_enabled: e.target.checked })} />
+                需要提醒
+              </label>
+              {newAnniversary.remind_enabled && <label className="block text-sm" style={{ color: 'var(--color-text)' }}>
+                提醒时间（北京时间）
+                <input type="time" required value={newAnniversary.remind_time}
+                  onChange={(e) => setNewAnniversary({ ...newAnniversary, remind_time: e.target.value })}
+                  className="input-field mt-1" />
+              </label>}
               <select
                 value={newAnniversary.type}
                 onChange={(e) => setNewAnniversary({ ...newAnniversary, type: e.target.value })}
                 className="input-field"
               >
-                <option value="birthday">🎂 生日</option>
-                <option value="love">💕 恋爱纪念</option>
-                <option value="holiday">🎉 节日</option>
-                <option value="other">📌 其他</option>
+                <option value="birthday">生日</option>
+                <option value="love">恋爱纪念</option>
+                <option value="holiday">节日</option>
+                <option value="other">其他</option>
               </select>
               <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text)' }}>
                 <input
@@ -971,7 +949,7 @@ export default function Calendar() {
             </div>
             <div className="flex gap-2 mt-4">
               <button
-                onClick={() => setShowAnniversaryModal(false)}
+                onClick={() => { setShowAnniversaryModal(false); setEditingAnniversary(null) }}
                 className="btn-secondary flex-1"
               >
                 取消
@@ -980,12 +958,33 @@ export default function Calendar() {
                 onClick={addAnniversary}
                 className="btn-primary flex-1"
               >
-                添加
+                {editingAnniversary ? '保存' : '添加'}
               </button>
             </div>
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function TodoCard({ todo, highlighted, onToggle, onEdit, onDelete }) {
+  return (
+    <div className={`task-card ${todo.is_completed ? 'is-complete' : ''}`} style={highlighted ? { outline: '2px solid var(--color-primary)' } : undefined}>
+      <input type="checkbox" checked={todo.is_completed} onChange={() => onToggle(todo)} aria-label={`${todo.is_completed ? '取消完成' : '完成'}：${todo.content}`} className="mt-1 w-[18px] h-[18px] shrink-0 accent-[var(--color-primary)]" />
+      <div className="task-card__body">
+        <p className={`task-card__title ${todo.is_completed ? 'line-through opacity-70' : ''}`}>{todo.content}</p>
+        <div className="task-card__meta">
+          {todo.occurrence_date && <span className="meta-chip"><Icon name="calendar" size={13} />{todo.occurrence_date}</span>}
+          {todo.recurrence && todo.recurrence !== 'none' && <span className="meta-chip"><Icon name="repeat" size={13} />{RECURRENCE_LABELS[todo.recurrence]}</span>}
+          {needsReminder(todo) ? <span className="meta-chip"><Icon name="bell" size={13} />{String(todo.remind_time || '09:00').slice(0, 5)}</span> : <span className="text-xs" style={{ color: 'var(--color-text-light)' }}>无提醒</span>}
+          {todo.is_completed && <span className="meta-chip"><Icon name="check" size={13} />已完成</span>}
+        </div>
+      </div>
+      <div className="task-card__actions">
+        <button type="button" className="icon-button" title="编辑" aria-label={`编辑待办：${todo.content}`} onClick={() => onEdit(todo)}><Icon name="pencil" size={16} /></button>
+        <button type="button" className="icon-button" title="删除" aria-label={`删除待办：${todo.content}`} onClick={() => onDelete(todo.id)}><Icon name="trash" size={16} /></button>
+      </div>
     </div>
   )
 }

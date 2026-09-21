@@ -4,6 +4,7 @@ import { supabase } from '../supabase/client.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useDataCache } from '../contexts/DataCacheContext.jsx'
 import { formatTime } from '../utils/dateUtils.js'
+import Icon from '../components/Icon.jsx'
 
 const SIGNED_URL_TTL = 604800 // 7天有效期，减少重新生成次数
 const PHOTO_PAGE_SIZE = 60
@@ -414,9 +415,8 @@ export default function Albums() {
   return (
     <div className="space-y-4">
       {loading && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs flex items-center gap-2"
-             style={{ backgroundColor: 'var(--color-primary)', color: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-          <span className="animate-spin">📷</span> 加载中...
+        <div className="glass-pill fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 text-xs flex items-center gap-2">
+          <Icon name="image" size={16} /> 加载中...
         </div>
       )}
       {/* Header */}
@@ -436,7 +436,7 @@ export default function Albums() {
           <span>←</span> {showPhotoModal ? '返回相册' : '返回'}
         </button>
         <h1 className="page-title" style={{ marginBottom: 0 }}>
-          <span>🖼️</span> {showPhotoModal ? currentAlbum?.name || '相册' : '分类相册'}
+          <Icon name="image" size={21} /> {showPhotoModal ? currentAlbum?.name || '相册' : '分类相册'}
         </h1>
         {!showPhotoModal && (
           <button
@@ -452,7 +452,7 @@ export default function Albums() {
       {/* 提示信息 */}
       {!showPhotoModal && albums.length > 0 && (
         <div className="card text-xs" style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-text-light)' }}>
-          💡 提示：点击相册可查看/上传照片。支持长按相册卡片进行改名或删除。
+          提示：点击相册可查看/上传照片。支持长按相册卡片进行改名或删除。
         </div>
       )}
 
@@ -461,7 +461,7 @@ export default function Albums() {
         <>
           {albums.length === 0 ? (
             <div className="card text-center py-16">
-              <span className="text-5xl mb-4 block">📷</span>
+              <Icon name="image" size={32} className="mx-auto mb-4" />
               <p style={{ color: 'var(--color-text-light)' }}>还没有相册哦</p>
               <p className="text-sm mt-1" style={{ color: 'var(--color-text-light)', opacity: 0.6 }}>
                 点击右上角"新建"创建相册
@@ -482,7 +482,7 @@ export default function Albums() {
                       {album.cover_url ? (
                         <img src={album.cover_url} alt={album.name} loading="lazy" className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-4xl">📁</span>
+                        <Icon name="image" size={26} />
                       )}
                     </div>
                     <div className="p-3">
@@ -500,7 +500,7 @@ export default function Albums() {
                       style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
                       title="改名"
                     >
-                      ✏️
+                      <Icon name="pencil" size={16} />
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); deleteAlbum(album) }}
@@ -508,7 +508,7 @@ export default function Albums() {
                       style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
                       title="删除"
                     >
-                      🗑️
+                      <Icon name="trash" size={16} />
                     </button>
                   </div>
                 </div>
@@ -533,7 +533,7 @@ export default function Albums() {
                 onChange={handlePhotoUpload}
                 className="hidden"
               />
-              <span className="text-sm">📷 上传</span>
+              <span className="text-sm inline-flex items-center gap-1"><Icon name="image" size={16} />上传</span>
             </label>
           </div>
 
@@ -548,7 +548,7 @@ export default function Albums() {
 
           {!photoLoadError && photos.length === 0 ? (
             <div className="card text-center py-12">
-              <span className="text-4xl block mb-2">📷</span>
+              <Icon name="image" size={28} className="mx-auto mb-2" />
               <p style={{ color: 'var(--color-text-light)' }}>还没有照片</p>
               <p className="text-xs mt-1" style={{ color: 'var(--color-text-light)', opacity: 0.6 }}>
                 点击上面的"上传"按钮添加照片
@@ -600,7 +600,7 @@ export default function Albums() {
                       className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                       style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
                     >
-                      ✕
+                      <Icon name="x" size={15} />
                     </button>
                   )}
                 </div>
@@ -698,8 +698,8 @@ export default function Albums() {
             onError={(e) => { e.target.style.opacity = '0.5' }}
           />
           {viewerTime && (
-            <div className="mt-4 px-4 py-2 rounded-full text-sm text-white" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
-              📷 {new Date(viewerTime).toLocaleString('zh-CN')}
+            <div className="glass-pill mt-4 px-4 py-2 text-sm text-white" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
+              <Icon name="calendar" size={14} className="inline mr-1" />{new Date(viewerTime).toLocaleString('zh-CN')}
             </div>
           )}
         </div>

@@ -4,9 +4,11 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import { useTheme } from '../contexts/ThemeContext.jsx'
 import { supabase } from '../supabase/client.js'
 import BottomNav from './BottomNav.jsx'
+import Icon from './Icon.jsx'
 
 export default function Layout() {
   const { user, profile, signOut } = useAuth()
+  const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const [notifications, setNotifications] = useState([])
 
@@ -51,45 +53,45 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col pb-20">
+    <div className="min-h-screen flex flex-col pb-24 md:pb-28">
       {/* Header */}
       <header
-        className="sticky top-0 z-40 backdrop-blur-md border-b px-4 py-3"
-        style={{
-          backgroundColor: 'color-mix(in srgb, var(--color-primary-light) 90%, transparent)',
-          borderColor: 'var(--color-primary)'
-        }}
+        className="sticky top-0 z-40 px-4 py-3 border-b backdrop-blur-2xl"
+        style={{ background: 'var(--surface)', borderColor: 'var(--stroke)' }}
       >
-        <div className="max-w-lg mx-auto flex items-center justify-between">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <NavLink to="/" className="flex items-center gap-2">
             <CowCat size={36} />
             <span
-              className="text-lg font-bold"
+              className="text-lg font-semibold tracking-tight"
               style={{ color: 'var(--color-text)' }}
             >
               LOHQ
             </span>
           </NavLink>
-          <div className="flex items-center gap-3 relative">
+          <div className="flex items-center gap-1.5 sm:gap-3 relative">
             <button
               type="button"
               aria-label={`提醒，${unreadCount} 条未读`}
               onClick={() => navigate('/notifications')}
-              className="relative text-lg leading-none p-1"
+              className="relative icon-button"
             >
-              🔔
+              <Icon name="bell" size={19} />
               {unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full text-[10px] leading-4 text-white" style={{ backgroundColor: '#E74C3C' }}>
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
             </button>
-            <span className="text-sm" style={{ color: 'var(--color-text-light)' }}>
+            <button type="button" className="icon-button" aria-label={theme === 'light' ? '切换黑夜模式' : '切换白天模式'} title={theme === 'light' ? '黑夜模式' : '白天模式'} onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+              <Icon name={theme === 'light' ? 'moon' : 'sun'} size={19} />
+            </button>
+            <span className="hidden sm:inline text-sm" style={{ color: 'var(--color-text-light)' }}>
               你好，{profile?.nickname || '宝宝'}
             </span>
             <button
               onClick={handleLogout}
-              className="text-xs hover:opacity-70 transition-opacity"
+              className="hidden sm:inline text-xs hover:opacity-70 transition-opacity"
               style={{ color: 'var(--color-text-light)' }}
             >
               退出
@@ -99,8 +101,8 @@ export default function Layout() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 px-4 py-4">
-        <div className="max-w-lg mx-auto">
+      <main className="flex-1 px-4 py-6 sm:py-8">
+        <div className="max-w-4xl mx-auto">
           <Outlet />
         </div>
       </main>
@@ -117,6 +119,7 @@ export function CowCat({ size = 32 }) {
     <img
       src="/images/logo.PNG"
       alt="Logo"
+      className="site-logo"
       width={size}
       height={size}
       style={{ objectFit: 'contain' }}
@@ -161,7 +164,7 @@ export function CuteCat({ size = 32, color, flip = false }) {
 // 可爱爱心 - 卡通风格，支持主题色
 export function PixelHeart({ size = 32, color }) {
   const { theme, themes } = useTheme()
-  const colors = themes[theme]?.colors || themes.pink.colors
+  const colors = themes[theme]?.colors || themes.light.colors
   const primaryColor = color || colors.primaryDark
   const lightColor = color ? color + '88' : colors.accent
   

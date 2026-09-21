@@ -4,6 +4,7 @@ import { supabase } from '../supabase/client.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useDataCache } from '../contexts/DataCacheContext.jsx'
 import { getWeekNumber, getWeekRange } from '../utils/dateUtils.js'
+import Icon from '../components/Icon.jsx'
 
 function StarRating({ value, onChange, size = 'text-xl', readOnly = false }) {
   const [hoverValue, setHoverValue] = useState(0)
@@ -21,7 +22,7 @@ function StarRating({ value, onChange, size = 'text-xl', readOnly = false }) {
           className={`${size} transition-all ${readOnly ? 'cursor-default' : 'cursor-pointer hover:scale-110'}`}
           style={{ color: (hoverValue || value) >= star ? '#FFD700' : '#DDD' }}
         >
-          ★
+          <Icon name="star" size={18} fill={(hoverValue || value) >= star ? 'currentColor' : 'none'} />
         </button>
       ))}
       {value > 0 && (
@@ -31,6 +32,10 @@ function StarRating({ value, onChange, size = 'text-xl', readOnly = false }) {
       )}
     </div>
   )
+}
+
+function RatingDisplay({ value, total = 5 }) {
+  return <span className="inline-flex gap-0.5" aria-label={`${value} / ${total} 星`}>{Array.from({ length: total }, (_, index) => <Icon key={index} name="star" size={16} fill={index < value ? 'currentColor' : 'none'} />)}</span>
 }
 
 export default function WeeklySummaries() {
@@ -210,9 +215,8 @@ export default function WeeklySummaries() {
   return (
     <div className="space-y-4">
       {loading && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs flex items-center gap-2"
-             style={{ backgroundColor: 'var(--color-primary)', color: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-          <span className="animate-spin">📊</span> 加载中...
+        <div className="glass-pill fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 text-xs flex items-center gap-2">
+          <Icon name="chart" size={16} /> 加载中...
         </div>
       )}
       {/* Header */}
@@ -225,13 +229,12 @@ export default function WeeklySummaries() {
           <span>←</span> 返回
         </button>
         <h1 className="page-title" style={{ marginBottom: 0 }}>
-          <span>📊</span> 周总结
+          <Icon name="chart" size={21} /> 周总结
         </h1>
         <button
           type="button"
           onClick={openCreateModal}
-          className="px-3 py-1.5 rounded-full text-xs font-bold transition-opacity hover:opacity-80"
-          style={{ backgroundColor: 'var(--color-primary)', color: 'white' }}
+          className="glass-pill px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-80"
         >
           {existingSummary ? '编辑' : '+ 写总结'}
         </button>
@@ -261,14 +264,14 @@ export default function WeeklySummaries() {
       {/* 本周评分汇总 */}
       {summaries.length > 0 && (
         <div className="card">
-          <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--color-text)' }}>💝 本周评分</h3>
+          <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--color-text)' }}>本周评分</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center p-3 rounded-lg" style={{ backgroundColor: 'var(--color-primary-light)' }}>
               <p className="text-xs mb-1" style={{ color: 'var(--color-text-light)' }}>我给自己的评分</p>
               {mySummary?.my_rating ? (
                 <>
                   <div className="text-2xl" style={{ color: '#FFD700' }}>
-                    {'★'.repeat(mySummary.my_rating)}{'☆'.repeat(5 - mySummary.my_rating)}
+                    <RatingDisplay value={mySummary.my_rating} />
                   </div>
                   <p className="text-xs mt-1" style={{ color: 'var(--color-text)' }}>
                     {mySummary.my_rating}/5.0
@@ -283,7 +286,7 @@ export default function WeeklySummaries() {
               {partnerSummary?.partner_rating ? (
                 <>
                   <div className="text-2xl" style={{ color: '#FFD700' }}>
-                    {'★'.repeat(partnerSummary.partner_rating)}{'☆'.repeat(5 - partnerSummary.partner_rating)}
+                    <RatingDisplay value={partnerSummary.partner_rating} />
                   </div>
                   <p className="text-xs mt-1" style={{ color: 'var(--color-text)' }}>
                     {partnerSummary.partner_rating}/5.0
@@ -301,7 +304,7 @@ export default function WeeklySummaries() {
       <div className="space-y-3">
         {summaries.length === 0 ? (
           <div className="text-center py-12 card">
-            <span className="text-4xl block mb-3">📊</span>
+            <Icon name="chart" size={27} className="mx-auto mb-3" />
             <p className="text-sm" style={{ color: 'var(--color-text-light)' }}>
               本周还没有总结
             </p>
@@ -322,7 +325,7 @@ export default function WeeklySummaries() {
                 </div>
                 {mySummary?.my_rating && (
                   <span className="text-sm" style={{ color: '#FFD700' }}>
-                    {'★'.repeat(mySummary.my_rating)}
+                    <RatingDisplay value={mySummary.my_rating} total={mySummary.my_rating} />
                   </span>
                 )}
               </div>
@@ -334,7 +337,7 @@ export default function WeeklySummaries() {
                   <div className="flex items-center justify-between mt-2 pt-2" style={{ borderTop: '1px dashed var(--color-primary-light)' }}>
                     <p className="text-xs" style={{ color: 'var(--color-text-light)', opacity: 0.6 }}>
                       {mySummary.updated_at && mySummary.updated_at !== mySummary.created_at 
-                        ? `✏️ 已编辑 · ${new Date(mySummary.updated_at).toLocaleString('zh-CN')}`
+                        ? `已编辑 · ${new Date(mySummary.updated_at).toLocaleString('zh-CN')}`
                         : new Date(mySummary.created_at).toLocaleString('zh-CN')
                       }
                     </p>
@@ -347,14 +350,14 @@ export default function WeeklySummaries() {
                         className="text-xs hover:opacity-70 px-2 py-1 rounded"
                         style={{ color: 'var(--color-primary-dark)', backgroundColor: 'var(--color-primary-light)' }}
                       >
-                        ✏️ 编辑
+                        <Icon name="pencil" size={15} /> 编辑
                       </button>
                       <button
                         onClick={() => deleteSummary(mySummary.id)}
                         className="text-xs hover:opacity-70 px-2 py-1 rounded"
                         style={{ color: '#E74C3C', backgroundColor: 'var(--color-primary-light)' }}
                       >
-                        🗑️ 删除
+                        <Icon name="trash" size={15} /> 删除
                       </button>
                     </div>
                   </div>
@@ -369,7 +372,7 @@ export default function WeeklySummaries() {
                     className="px-4 py-2 rounded-lg text-xs font-bold text-white"
                     style={{ backgroundColor: 'var(--color-primary)' }}
                   >
-                    ✍️ 写总结
+                    写总结
                   </button>
                 </div>
               )}
@@ -389,7 +392,7 @@ export default function WeeklySummaries() {
                 </div>
                 {partnerSummary?.my_rating && (
                   <span className="text-sm" style={{ color: '#FFD700' }}>
-                    {'★'.repeat(partnerSummary.my_rating)}
+                    <RatingDisplay value={partnerSummary.my_rating} total={partnerSummary.my_rating} />
                   </span>
                 )}
               </div>
@@ -415,7 +418,7 @@ export default function WeeklySummaries() {
       {/* Tips */}
       <div className="text-center">
         <p className="text-xs" style={{ color: 'var(--color-text-light)', opacity: 0.6 }}>
-          💡 小贴士：每周日晚上写一篇总结，回顾这一周的美好时光
+          小贴士：每周日晚上写一篇总结，回顾这一周的美好时光
         </p>
       </div>
 
@@ -425,7 +428,7 @@ export default function WeeklySummaries() {
              style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="card w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold mb-2" style={{ color: 'var(--color-text)' }}>
-              ✍️ 我的周总结
+              我的周总结
             </h3>
             <p className="text-xs mb-4" style={{ color: 'var(--color-text-light)' }}>
               {currentYear}年 第 {currentWeek} 周
@@ -435,13 +438,13 @@ export default function WeeklySummaries() {
             <div className="space-y-3 mb-4 p-3 rounded-lg" style={{ backgroundColor: 'var(--color-primary-light)' }}>
               <div>
                 <label className="text-xs font-bold block mb-1" style={{ color: 'var(--color-text)' }}>
-                  🌟 我这周的表现（给自己打分）
+                  我这周的表现（给自己打分）
                 </label>
                 <StarRating value={newRating} onChange={setNewRating} />
               </div>
               <div>
                 <label className="text-xs font-bold block mb-1" style={{ color: 'var(--color-text)' }}>
-                  💝 宝宝这周的表现（给宝宝打分）
+                  宝宝这周的表现（给宝宝打分）
                 </label>
                 <StarRating value={newPartnerRating} onChange={setNewPartnerRating} />
               </div>

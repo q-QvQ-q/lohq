@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { CowCat, PixelHeart } from '../components/Layout.jsx'
+import Icon from '../components/Icon.jsx'
 import { useTheme } from '../contexts/ThemeContext.jsx'
+import { CowCat } from '../components/Layout.jsx'
 
 export default function Login() {
-  const { theme, themes } = useTheme()
-  const currentTheme = themes[theme]
-  const heartColor = currentTheme?.colors?.primaryDark || '#D4A5A5'
-  
+  const { theme, setTheme } = useTheme()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -31,13 +29,12 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden" style={{ backgroundColor: 'var(--color-primary-light)' }}>
-      <PixelBackground color={heartColor} />
-
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      <button type="button" className="icon-button glass-panel absolute top-5 right-5 z-20" aria-label={theme === 'light' ? '切换黑夜模式' : '切换白天模式'} onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}><Icon name={theme === 'light' ? 'moon' : 'sun'} size={18} /></button>
       <div className="relative z-10 w-full max-w-sm">
         <div className="text-center mb-8 animate-fade-in">
-          <div className="inline-block mb-4 p-4 rounded-2xl" style={{ backgroundColor: 'rgba(255,255,255,0.7)' }}>
-            <CowCat size={72} />
+          <div className="inline-grid place-items-center mb-4 w-16 h-16 rounded-[20px] glass-panel">
+            <CowCat size={48} />
           </div>
           <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--color-text)' }}>LOHQ</h1>
           <p className="text-sm" style={{ color: 'var(--color-text-light)' }}>我们的恋爱小窝</p>
@@ -77,7 +74,7 @@ export default function Login() {
           </div>
 
           <button type="submit" className="btn-primary w-full" disabled={loading}>
-            {loading ? '登录中...' : '🐾 登录'}
+            {loading ? '登录中...' : '登录'}
           </button>
 
           <div className="text-center pt-2">
@@ -92,28 +89,9 @@ export default function Login() {
 
         <div className="text-center mt-6">
           <p className="text-xs" style={{ color: 'var(--color-text-light)', opacity: 0.7 }}>
-            💗 仅我们两个人可见的私密空间 💗
+            仅我们两个人可见的私密空间
           </p>
         </div>
-      </div>
-    </div>
-  )
-}
-
-function PixelBackground({ color }) {
-  return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      <div className="absolute top-10 left-10 opacity-20">
-        <PixelHeart size={40} color={color} />
-      </div>
-      <div className="absolute top-32 right-8 opacity-15">
-        <PixelHeart size={30} color={color} />
-      </div>
-      <div className="absolute bottom-20 left-16 opacity-20">
-        <PixelHeart size={50} color={color} />
-      </div>
-      <div className="absolute bottom-40 right-12 opacity-15">
-        <PixelHeart size={35} color={color} />
       </div>
     </div>
   )

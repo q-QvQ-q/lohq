@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase/client.js'
 import { useDataCache } from '../contexts/DataCacheContext.jsx'
+import Icon from '../components/Icon.jsx'
 
 export default function KnowledgeBase() {
   const navigate = useNavigate()
@@ -79,7 +80,7 @@ export default function KnowledgeBase() {
           </button>
         </div>
         <h1 className="page-title">
-          <span>📚</span> 错题本
+          <Icon name="book" size={21} /> 错题本
         </h1>
       </div>
 
@@ -88,14 +89,7 @@ export default function KnowledgeBase() {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setSelectedTag('')}
-            className={`tag cursor-pointer transition-colors ${
-              !selectedTag ? 'font-bold' : ''
-            }`}
-            style={
-              !selectedTag
-                ? { backgroundColor: 'var(--color-primary)', color: '#fff' }
-                : {}
-            }
+            className={`tag cursor-pointer transition-colors ${!selectedTag ? 'is-selected' : ''}`}
           >
             全部
           </button>
@@ -103,14 +97,7 @@ export default function KnowledgeBase() {
             <button
               key={tag}
               onClick={() => setSelectedTag(tag === selectedTag ? '' : tag)}
-              className={`tag cursor-pointer transition-colors ${
-                tag === selectedTag ? 'font-bold' : ''
-              }`}
-              style={
-                tag === selectedTag
-                  ? { backgroundColor: 'var(--color-primary)', color: '#fff' }
-                  : {}
-              }
+              className={`tag cursor-pointer transition-colors ${tag === selectedTag ? 'is-selected' : ''}`}
             >
               #{tag}
             </button>
@@ -124,7 +111,7 @@ export default function KnowledgeBase() {
           className="absolute left-4 top-1/2 -translate-y-1/2"
           style={{ color: 'var(--color-text-light)' }}
         >
-          🔍
+          <Icon name="search" size={18} />
         </span>
         <input
           type="text"
@@ -142,7 +129,7 @@ export default function KnowledgeBase() {
         </div>
       ) : filteredItems.length === 0 ? (
         <div className="card text-center py-12">
-          <span className="text-5xl mb-3 block">🐱</span>
+          <Icon name="book" size={30} className="mx-auto mb-3" />
           <p style={{ color: 'var(--color-text-light)' }}>
             {searchQuery || selectedTag ? '没有找到匹配的条目' : '还没有错题条目哦~'}
           </p>

@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import { useTheme } from '../contexts/ThemeContext.jsx'
+import Icon from '../components/Icon.jsx'
 
 export default function Register() {
+  const { theme, setTheme } = useTheme()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -47,22 +50,8 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden" style={{ backgroundColor: 'var(--color-primary-light)' }}>
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-8 left-8 opacity-15">
-          <svg width="40" height="40" viewBox="0 0 10 9">
-            <rect x="1" y="1" width="2" height="2" fill="var(--color-primary)" />
-            <rect x="7" y="1" width="2" height="2" fill="var(--color-primary)" />
-            <rect x="0" y="2" width="4" height="3" fill="var(--color-primary)" />
-            <rect x="6" y="2" width="4" height="3" fill="var(--color-primary)" />
-            <rect x="1" y="5" width="8" height="1" fill="var(--color-primary)" />
-            <rect x="2" y="6" width="6" height="1" fill="var(--color-primary)" />
-            <rect x="3" y="7" width="4" height="1" fill="var(--color-primary)" />
-            <rect x="4" y="8" width="2" height="1" fill="var(--color-primary)" />
-          </svg>
-        </div>
-      </div>
-
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      <button type="button" className="icon-button glass-panel absolute top-5 right-5 z-20" aria-label={theme === 'light' ? '切换黑夜模式' : '切换白天模式'} onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}><Icon name={theme === 'light' ? 'moon' : 'sun'} size={18} /></button>
       <div className="relative z-10 w-full max-w-sm">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text)' }}>创建 LOHQ 账号</h1>
@@ -142,7 +131,7 @@ export default function Register() {
                   border: gender === 'male' ? 'none' : '2px solid var(--color-primary)'
                 }}
               >
-                👦 男生
+                男生
               </button>
               <button
                 type="button"
@@ -156,13 +145,13 @@ export default function Register() {
                   border: gender === 'female' ? 'none' : '2px solid var(--color-primary)'
                 }}
               >
-                👧 女生
+                女生
               </button>
             </div>
           </div>
 
           <button type="submit" className="btn-primary w-full" disabled={loading}>
-            {loading ? '注册中...' : '🐾 创建账号'}
+            {loading ? '注册中...' : '创建账号'}
           </button>
 
           <div className="text-center pt-2">

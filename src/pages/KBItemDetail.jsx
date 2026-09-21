@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase/client.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useDataCache } from '../contexts/DataCacheContext.jsx'
+import Icon from '../components/Icon.jsx'
 
 export default function KBItemDetail() {
   const { id } = useParams()
@@ -59,9 +60,8 @@ export default function KBItemDetail() {
   return (
     <div className="space-y-4 animate-fade-in">
       {loading && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs flex items-center gap-2"
-             style={{ backgroundColor: 'var(--color-primary)', color: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-          <span className="animate-spin">📖</span> 加载中...
+        <div className="glass-pill fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 text-xs flex items-center gap-2">
+          <Icon name="book" size={16} /> 加载中...
         </div>
       )}
       <div className="flex items-center justify-between">
@@ -73,7 +73,7 @@ export default function KBItemDetail() {
           <span>←</span> 返回
         </button>
         <h1 className="page-title">
-          <span>📖</span> 条目详情
+          <Icon name="book" size={20} /> 条目详情
         </h1>
         <div className="w-16" />
       </div>
@@ -103,7 +103,7 @@ export default function KBItemDetail() {
       {item.content_male && (
         <div className={`card ${isMale ? 'border-2' : ''}`} style={isMale ? { borderColor: 'var(--color-primary)' } : {}}>
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-xl">👦</span>
+            <Icon name="user" size={19} />
             <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>男生应该怎么做</h3>
           </div>
           <div className="whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--color-text)' }}>
@@ -116,7 +116,7 @@ export default function KBItemDetail() {
       {item.content_female && (
         <div className={`card ${!isMale ? 'border-2' : ''}`} style={!isMale ? { borderColor: 'var(--color-primary)' } : {}}>
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-xl">👧</span>
+            <Icon name="user" size={19} />
             <h3 className="font-bold" style={{ color: 'var(--color-text)' }}>女生应该怎么做</h3>
           </div>
           <div className="whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--color-text)' }}>
@@ -137,10 +137,10 @@ export default function KBItemDetail() {
           onClick={() => navigate(`/knowledge/${id}/edit`)}
           className="btn-primary flex-1"
         >
-          ✏️ 编辑
+          <Icon name="pencil" size={16} /> 编辑
         </button>
         <button onClick={handleDelete} className="btn-danger flex-1">
-          🗑️ 删除
+          <Icon name="trash" size={16} /> 删除
         </button>
       </div>
     </div>

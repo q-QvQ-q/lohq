@@ -18,6 +18,7 @@ create table public.profiles (
   pending_start_date date,
   pending_by uuid references public.profiles(id),
   pending_at timestamptz,
+  last_login_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

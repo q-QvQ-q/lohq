@@ -76,7 +76,7 @@ export default function Notifications() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <button onClick={() => navigate(-1)} className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>← 返回</button>
-        <h1 className="page-title" style={{ marginBottom: 0 }}>🔔 提醒</h1>
+        <h1 className="page-title" style={{ marginBottom: 0 }}>提醒</h1>
         <span className="text-xs" style={{ color: 'var(--color-text-light)' }}>{items.length} 条未读</span>
       </div>
       {loading ? <p className="text-center text-sm">加载中...</p> : items.length === 0 ? (
@@ -89,7 +89,7 @@ export default function Notifications() {
             <time className="text-xs whitespace-nowrap" style={{ color: 'var(--color-text-light)' }}>{formatDateTime(item.created_at)}</time>
           </div>
           {item.body && <p className="text-xs mt-2 break-words" style={{ color: 'var(--color-text-light)' }}>{item.body}</p>}
-          <p className="text-xs mt-2" style={{ color: 'var(--color-primary-dark)' }}>查看对应备忘录 →</p>
+          <p className="text-xs mt-2" style={{ color: 'var(--color-primary-dark)' }}>查看详情 →</p>
         </button>
       ))}
     </div>
