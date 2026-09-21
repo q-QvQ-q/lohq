@@ -6,8 +6,8 @@ export const THEMES = {
   light: {
     name: '白天模式',
     colors: {
-      primary: '#A75C75', primaryLight: '#F5E4EA', primaryDark: '#7D4057',
-      text: '#342A2E', textLight: '#705963', background: '#F8EFF2', accent: '#F2DDE5'
+      primary: '#E18EAA', primaryLight: '#F9E8EE', primaryDark: '#AC687F',
+      text: '#3D2E34', textLight: '#80636D', background: '#FCF4F6', accent: '#F7E1E8'
     }
   },
   dark: {
