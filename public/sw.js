@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lohq-cache-v2'
+const CACHE_NAME = 'lohq-cache-v3'
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -121,6 +121,25 @@ self.addEventListener('message', (event) => {
   }
 })
 
+function safeNotificationPath(value) {
+  try {
+    const candidate = typeof value === 'string' ? value.trim() : '/notifications'
+    if (!candidate.startsWith('/') || candidate.startsWith('//') || candidate.includes('\\')) {
+      return '/notifications'
+    }
+    const decoded = decodeURIComponent(candidate)
+    if (decoded.startsWith('//') || decoded.includes('\\') || /[\u0000-\u001f\u007f]/.test(decoded)) {
+      return '/notifications'
+    }
+    const target = new URL(candidate, self.location.origin)
+    return target.origin === self.location.origin
+      ? target.pathname + target.search + target.hash
+      : '/notifications'
+  } catch {
+    return '/notifications'
+  }
+}
+
 // iPhone 主屏幕网页应用收到 Web Push 时必须展示可见通知。
 self.addEventListener('push', (event) => {
   let payload = {}
@@ -131,13 +150,7 @@ self.addEventListener('push', (event) => {
   }
   const title = typeof payload.title === 'string' ? payload.title : 'LOHQ 提醒'
   const body = typeof payload.body === 'string' ? payload.body : ''
-  let url = '/notifications'
-  try {
-    const target = new URL(payload.url || url, self.location.origin)
-    if (target.origin === self.location.origin) url = target.pathname + target.search + target.hash
-  } catch {
-    // Never follow an invalid or cross-origin notification URL.
-  }
+  const url = safeNotificationPath(payload.url)
   event.waitUntil(self.registration.showNotification(title, {
     body,
     icon: '/icon-192.png',
@@ -149,7 +162,7 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const path = event.notification.data?.url || '/notifications'
+  const path = safeNotificationPath(event.notification.data?.url)
   const target = new URL(path, self.location.origin)
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })

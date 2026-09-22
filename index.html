@@ -11,6 +11,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="LOHQ" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+    <link rel="preload" as="style" href="https://cdn.jsdelivr.net/gh/eterfinal/ReiFonts/HuiwenMinchoGBK/result.css" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet" /><link href="https://cdn.jsdelivr.net/gh/eterfinal/ReiFonts/HuiwenMinchoGBK/result.css" rel="stylesheet" /></noscript>
     <link rel="preconnect" href="https://wselpiozikahgfsgwcdk.supabase.co" crossorigin />
     <link rel="dns-prefetch" href="https://wselpiozikahgfsgwcdk.supabase.co" />
     <title>LOHQ - 我们的恋爱小窝</title>
@@ -19,10 +25,15 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
-      if ('serviceWorker' in navigator) {
+      const isLocalPreview = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+      if ('serviceWorker' in navigator && !isLocalPreview) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').catch(() => {});
         });
+      } else if ('serviceWorker' in navigator && isLocalPreview) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          registrations.forEach((registration) => registration.unregister());
+        }).catch(() => {});
       }
     </script>
   </body>

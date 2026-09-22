@@ -37,7 +37,16 @@ const paths = {
   gift: <><rect x="3" y="10" width="18" height="11" rx="1"/><path d="M3 10h18M12 10v11M12 10c-7 0-8-7-4-7 2 0 4 3 4 7zm0 0c7 0 8-7 4-7-2 0-4 3-4 7z"/></>,
   undo: <><path d="M9 7 4 12l5 5M4 12h10a6 6 0 0 1 0 12"/></>,
   sparkle: <path d="m12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/>,
-  star: <path d="m12 2 3.1 6.3 7 .9-5.1 5 1.2 7-6.2-3.3-6.2 3.3 1.2-7-5.1-5 7-.9z"/>
+  star: <path d="m12 2 3.1 6.3 7 .9-5.1 5 1.2 7-6.2-3.3-6.2 3.3 1.2-7-5.1-5 7-.9z"/>,
+  coin: <><circle cx="12" cy="12" r="9"/><path d="M9 9.5c0-1.1 1.2-2 3-2s3 .8 3 2-1.1 1.8-3 2-3 .9-3 2 1.2 2 3 2 3-.9 3-2M12 5v14"/></>,
+  shop: <><path d="M4 9v11h16V9M3 4h18l-1 5a3 3 0 0 1-5 1 3 3 0 0 1-6 0 3 3 0 0 1-5-1z"/><path d="M9 20v-5h6v5"/></>,
+  mapPin: <><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0z"/><circle cx="12" cy="10" r="2.5"/></>,
+  utensils: <><path d="M7 3v8M4 3v5a3 3 0 0 0 6 0V3M7 11v10M17 3v18M17 3c3 2 3 7 0 9"/></>,
+  envelope: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 7 9-7"/></>,
+  send: <><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></>,
+  archive: <><rect x="3" y="5" width="18" height="4" rx="1"/><path d="M5 9v11h14V9M9 13h6"/></>,
+  camera: <><path d="M4 7h3l2-3h6l2 3h3a2 2 0 0 1 2 2v10H2V9a2 2 0 0 1 2-2z"/><circle cx="12" cy="13" r="4"/></>,
+  location: <><circle cx="12" cy="12" r="9"/><path d="m15 9-2 6-6 2 2-6z"/></>
 }
 
 export default function Icon({ name, size = 18, className = '', ...props }) {

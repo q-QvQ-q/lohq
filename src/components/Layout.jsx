@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useTheme } from '../contexts/ThemeContext.jsx'
 import { supabase } from '../supabase/client.js'
@@ -10,6 +10,7 @@ export default function Layout() {
   const { user, profile, signOut } = useAuth()
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
+  const location = useLocation()
   const [notifications, setNotifications] = useState([])
 
   useEffect(() => {
@@ -45,7 +46,21 @@ export default function Layout() {
     }
   }, [user?.id])
 
+  useEffect(() => {
+    if (navigator.connection?.saveData || /2g/.test(navigator.connection?.effectiveType || '')) return undefined
+    const prefetchRoutes = () => {
+      import('../pages/Calendar.jsx')
+      import('../pages/Memos.jsx')
+      import('../pages/Settings.jsx')
+    }
+    const timeoutId = window.setTimeout(prefetchRoutes, 450)
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [])
+
   const unreadCount = notifications.length
+  const isHome = location.pathname === '/' || location.pathname === '/__preview/home'
 
   const handleLogout = async () => {
     await signOut()
@@ -53,23 +68,25 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col pb-24 md:pb-28">
+    <div className={`layout-shell min-h-screen flex flex-col pb-24 md:pb-28 ${isHome ? 'is-home' : 'is-feature'}`}>
       {/* Header */}
       <header
-        className="sticky top-0 z-40 px-4 py-3 border-b backdrop-blur-2xl"
+        className={`app-header sticky top-0 z-40 px-4 border-b backdrop-blur-2xl ${isHome ? 'py-3' : 'app-header--feature'}`}
         style={{ background: 'var(--surface)', borderColor: 'var(--stroke)' }}
       >
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
-          <NavLink to="/" className="flex items-center gap-2">
-            <CowCat size={36} />
-            <span
-              className="text-lg font-semibold tracking-tight"
-              style={{ color: 'var(--color-text)' }}
-            >
-              LOHQ
-            </span>
-          </NavLink>
-          <div className="flex items-center gap-1.5 sm:gap-3 relative">
+          {isHome && (
+            <NavLink to="/" className="flex items-center gap-2">
+              <CowCat size={36} />
+              <span
+                className="text-lg font-semibold tracking-tight"
+                style={{ color: 'var(--color-text)' }}
+              >
+                LOHQ
+              </span>
+            </NavLink>
+          )}
+          <div className={`flex items-center gap-1.5 sm:gap-3 relative ${isHome ? '' : 'ml-auto'}`}>
             <button
               type="button"
               aria-label={`提醒，${unreadCount} 条未读`}
@@ -83,19 +100,21 @@ export default function Layout() {
                 </span>
               )}
             </button>
-            <button type="button" className="icon-button" aria-label={theme === 'light' ? '切换黑夜模式' : '切换白天模式'} title={theme === 'light' ? '黑夜模式' : '白天模式'} onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
-              <Icon name={theme === 'light' ? 'moon' : 'sun'} size={19} />
-            </button>
-            <span className="hidden sm:inline text-sm" style={{ color: 'var(--color-text-light)' }}>
-              你好，{profile?.nickname || '宝宝'}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="hidden sm:inline text-xs hover:opacity-70 transition-opacity"
-              style={{ color: 'var(--color-text-light)' }}
-            >
-              退出
-            </button>
+            {isHome && <>
+              <button type="button" className="icon-button" aria-label={theme === 'light' ? '切换黑夜模式' : '切换白天模式'} title={theme === 'light' ? '黑夜模式' : '白天模式'} onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+                <Icon name={theme === 'light' ? 'moon' : 'sun'} size={19} />
+              </button>
+              <span className="hidden sm:inline text-sm" style={{ color: 'var(--color-text-light)' }}>
+                你好，{profile?.nickname || '宝宝'}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="hidden sm:inline text-xs hover:opacity-70 transition-opacity"
+                style={{ color: 'var(--color-text-light)' }}
+              >
+                退出
+              </button>
+            </>}
           </div>
         </div>
       </header>

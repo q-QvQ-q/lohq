@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabase/client.js'
-import { daysBetween, daysUntil, formatDate, formatDateShort, getAnniversaryTypeLabel } from '../utils/dateUtils.js'
+import { daysBetween, daysUntil, formatDateShort, getAnniversaryTypeLabel } from '../utils/dateUtils.js'
 import Icon from '../components/Icon.jsx'
 import ProfileAvatar from '../components/ProfileAvatar.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { useDataCache } from '../contexts/DataCacheContext.jsx'
+import { usePresence } from '../contexts/PresenceContext.jsx'
 
 const MOODS = {
   happy: { icon: 'sun', label: '开心' },
@@ -16,11 +17,11 @@ const MOODS = {
 }
 
 const QUICK_LINKS = [
-  { to: '/calendar?tab=diary', title: '心情日记', icon: 'note', description: '写下今天的心情' },
-  { to: '/calendar?tab=anniversary', title: '纪念日', icon: 'calendar', description: '记住重要的日子' },
   { to: '/albums', title: '我们的相册', icon: 'image', description: '收藏一起的瞬间' },
   { to: '/wishes', title: '愿望清单', icon: 'sparkle', description: '把以后慢慢实现' },
-  { to: '/wallet', title: '恋爱账单', icon: 'wallet', description: '记录我们的小开销' },
+  { to: '/shop', title: '点单小店', icon: 'shop', description: '用甜心币兑换小心愿' },
+  { to: '/check-ins', title: '打卡评价', icon: 'mapPin', description: '收藏一起体验过的地方' },
+  { to: '/future-letters', title: '未来信件', icon: 'envelope', description: '写给未来某一天的我们' },
   { to: '/memos', title: '备忘录', icon: 'note', description: '留下彼此的提醒' },
   { to: '/reflections', title: '检讨书', icon: 'file', description: '认真写下想说的话' },
   { to: '/weekly', title: '周总结', icon: 'chart', description: '回顾这一周的我们' }
@@ -59,17 +60,10 @@ export default function Home({ previewData = null }) {
   const profile = previewData?.profile || auth.profile
   const partnerProfile = previewData?.partnerProfile || auth.partnerProfile
   const { fetchWithCache } = useDataCache()
+  const { onlineSince: liveOnlineSince } = usePresence()
   const [startDate, setStartDate] = useState(previewData?.startDate || '2025-01-29')
   const [anniversaries, setAnniversaries] = useState(previewData?.anniversaries || [])
   const [todayDiaries, setTodayDiaries] = useState(previewData?.todayDiaries || [])
-  const [onlineSince, setOnlineSince] = useState(() => {
-    if (!previewData) return {}
-    const now = new Date().toISOString()
-    return {
-      [previewData.profile?.id]: now,
-      [previewData.partnerProfile?.id]: now
-    }
-  })
   const [lastLoginAt, setLastLoginAt] = useState(() => {
     if (!previewData) return {}
     const now = new Date().toISOString()
@@ -78,10 +72,16 @@ export default function Home({ previewData = null }) {
       [previewData.partnerProfile?.id]: now
     }
   })
+  const [missYouState, setMissYouState] = useState('idle')
   const [loading, setLoading] = useState(!previewData)
 
   const today = useMemo(() => new Date(), [])
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const onlineSince = useMemo(() => {
+    if (!previewData) return liveOnlineSince
+    const now = new Date().toISOString()
+    return { [previewData.profile?.id]: now, [previewData.partnerProfile?.id]: now }
+  }, [previewData, liveOnlineSince])
 
   useEffect(() => {
     if (previewData) return
@@ -90,11 +90,6 @@ export default function Home({ previewData = null }) {
 
   useEffect(() => {
     if (previewData || !profile?.id) return undefined
-
-    const presenceRoom = [profile.id, partnerProfile?.id].filter(Boolean).sort().join(':')
-    const channel = supabase.channel(`couple-presence:${presenceRoom}`, {
-      config: { presence: { key: profile.id } }
-    })
 
     const refreshLastLogins = async () => {
       const profileIds = [profile.id, partnerProfile?.id].filter(Boolean)
@@ -109,29 +104,16 @@ export default function Home({ previewData = null }) {
       })
     }
 
-    const syncPresence = () => {
-      const next = {}
-      Object.values(channel.presenceState()).flat().forEach(entry => {
-        const personId = entry.profile_id || entry.user_id
-        if (!personId || !entry.online_at) return
-        if (!next[personId] || entry.online_at < next[personId]) next[personId] = entry.online_at
-      })
-      setOnlineSince(next)
-      refreshLastLogins()
+    const refreshOnVisible = () => {
+      if (document.visibilityState === 'visible') refreshLastLogins()
     }
-
-    channel
-      .on('presence', { event: 'sync' }, syncPresence)
-      .subscribe(status => {
-        if (status === 'SUBSCRIBED') {
-          channel.track({ profile_id: profile.id, online_at: new Date().toISOString() })
-          refreshLastLogins()
-        }
-      })
+    refreshLastLogins()
+    const refreshInterval = window.setInterval(refreshLastLogins, 20000)
+    document.addEventListener('visibilitychange', refreshOnVisible)
 
     return () => {
-      channel.untrack()
-      supabase.removeChannel(channel)
+      window.clearInterval(refreshInterval)
+      document.removeEventListener('visibilitychange', refreshOnVisible)
     }
   }, [profile?.id, partnerProfile?.id, previewData])
 
@@ -205,6 +187,36 @@ export default function Home({ previewData = null }) {
     .sort((a, b) => a.days_left - b.days_left)
     .slice(0, 2)
 
+  async function sendMissYouReminder() {
+    if (missYouState === 'sending') return
+    if (!profile?.partner_id || !partnerProfile?.id) {
+      setMissYouState('unavailable')
+      window.setTimeout(() => setMissYouState('idle'), 2400)
+      return
+    }
+
+    if (previewData) {
+      setMissYouState('sent')
+      window.setTimeout(() => setMissYouState('idle'), 2400)
+      return
+    }
+
+    setMissYouState('sending')
+    const { error } = await supabase
+      .from('notifications')
+      .insert({
+        recipient_id: profile.partner_id,
+        actor_id: profile.id,
+        type: 'miss_you',
+        title: '对方正在想念你',
+        body: `${profile.nickname || '对方'}正在想念你`,
+        resource_path: '/'
+      })
+
+    setMissYouState(error ? 'failed' : 'sent')
+    window.setTimeout(() => setMissYouState('idle'), 2400)
+  }
+
   return (
     <div className="home-memory max-w-2xl mx-auto animate-fade-in">
       {loading && (
@@ -214,11 +226,6 @@ export default function Home({ previewData = null }) {
       )}
 
       <section className="memory-hero" aria-labelledby="days-together-title">
-        <div className="memory-hero__topline">
-          <span className="memory-hero__eyebrow">我们的第 {totalDays + 1} 天</span>
-          <time dateTime={todayKey}>{dateLabel}</time>
-        </div>
-
         <div className="memory-hero__counter">
           <p id="days-together-title">我们已经相伴</p>
           <div className="memory-hero__number">
@@ -236,7 +243,16 @@ export default function Home({ previewData = null }) {
               </small>
             </div>
           </div>
-          <span className="couple-portraits__heart" aria-hidden="true"><Icon name="heart" size={24} /></span>
+          <button
+            type="button"
+            className={`couple-portraits__heart ${missYouState !== 'idle' ? `is-${missYouState}` : ''}`}
+            onClick={sendMissYouReminder}
+            disabled={missYouState === 'sending'}
+            title={missYouState === 'sent' ? '已提醒对方' : missYouState === 'unavailable' ? '绑定伴侣后即可使用' : missYouState === 'failed' ? '发送失败，请稍后再试' : '提醒对方：我正在想念你'}
+            aria-label={missYouState === 'sent' ? '已提醒对方' : missYouState === 'unavailable' ? '绑定伴侣后即可使用想念提醒' : missYouState === 'failed' ? '发送失败，请稍后再试' : '提醒对方：我正在想念你'}
+          >
+            <Icon name={missYouState === 'sent' ? 'check' : missYouState === 'failed' ? 'x' : 'heart'} size={22} />
+          </button>
           <div className="couple-portrait">
             <ProfileAvatar profile={partnerProfile} size={68} />
             <div className="couple-portrait__meta">
@@ -250,7 +266,7 @@ export default function Home({ previewData = null }) {
 
         <div className="memory-hero__since">
           <span className="memory-hero__line" aria-hidden="true" />
-          <span>从 {formatDate(startDate)} 开始</span>
+          <time dateTime={todayKey}>{dateLabel}</time>
           <span className="memory-hero__line" aria-hidden="true" />
         </div>
       </section>
@@ -258,7 +274,6 @@ export default function Home({ previewData = null }) {
       <section className="mood-section" aria-labelledby="today-mood-title">
         <div className="section-heading">
           <div>
-            <p className="section-kicker">今天的我们</p>
             <h2 id="today-mood-title">心情交换站</h2>
           </div>
           <Link to="/calendar?tab=diary" className="section-link">去写日记</Link>
@@ -287,12 +302,11 @@ export default function Home({ previewData = null }) {
       <section className="quick-section" aria-labelledby="quick-title">
         <div className="section-heading">
           <div>
-            <p className="section-kicker">一起慢慢收集</p>
             <h2 id="quick-title">我们的日常</h2>
           </div>
         </div>
         <div className="quick-grid">
-          {QUICK_LINKS.map(item => <QuickCard key={item.to} {...item} />)}
+          {QUICK_LINKS.map(item => <QuickCard key={item.to} {...item} preview={Boolean(previewData)} />)}
         </div>
       </section>
 
@@ -314,9 +328,9 @@ export default function Home({ previewData = null }) {
   )
 }
 
-function QuickCard({ to, title, icon, description }) {
+function QuickCard({ to, title, icon, description, preview = false }) {
   return (
-    <Link to={to} className="quick-card">
+    <Link to={preview && ['/shop', '/check-ins', '/future-letters'].includes(to) ? `/__preview${to}` : to} className="quick-card">
       <span className="quick-card__icon"><Icon name={icon} size={20} /></span>
       <div><strong>{title}</strong><p>{description}</p></div>
       <Icon name="chevronRight" size={17} className="quick-card__arrow" />

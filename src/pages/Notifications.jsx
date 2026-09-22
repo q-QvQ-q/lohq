@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { supabase } from '../supabase/client.js'
 import { formatDateTime } from '../utils/dateUtils.js'
+import { safeAppPath } from '../utils/navigation.js'
 
 export default function Notifications() {
   const { user } = useAuth()
@@ -69,12 +70,12 @@ export default function Notifications() {
     }
     setItems(current => current.filter(entry => entry.id !== item.id))
     window.dispatchEvent(new Event('notifications-changed'))
-    navigate(item.resource_path?.startsWith('/') ? item.resource_path : '/memos')
+    navigate(safeAppPath(item.resource_path, '/notifications'))
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="feature-page-header flex items-center justify-between">
         <button onClick={() => navigate(-1)} className="text-sm font-bold" style={{ color: 'var(--color-text)' }}>← 返回</button>
         <h1 className="page-title" style={{ marginBottom: 0 }}>提醒</h1>
         <span className="text-xs" style={{ color: 'var(--color-text-light)' }}>{items.length} 条未读</span>

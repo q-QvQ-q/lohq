@@ -1,11 +1,33 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../supabase/client.js'
 import { useAuth } from './AuthContext.jsx'
-import { getWeekNumber } from '../utils/dateUtils.js'
 
 const DataCacheContext = createContext(null)
 
-const CACHE_TTL = 30000
+const CACHE_TTL = 90000
+const SESSION_CACHE_PREFIX = 'lohq_data_cache:'
+
+function readSessionEntry(userId, key, ttl) {
+  if (!userId) return null
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(`${SESSION_CACHE_PREFIX}${userId}`) || '{}')
+    const entry = stored[key]
+    return entry && Date.now() - entry.timestamp < ttl ? entry : null
+  } catch {
+    return null
+  }
+}
+
+function writeSessionEntry(userId, key, entry) {
+  if (!userId) return
+  try {
+    const storageKey = `${SESSION_CACHE_PREFIX}${userId}`
+    const stored = JSON.parse(sessionStorage.getItem(storageKey) || '{}')
+    sessionStorage.setItem(storageKey, JSON.stringify({ ...stored, [key]: entry }))
+  } catch {
+    // A full or unavailable browser storage should never delay the page.
+  }
+}
 
 export function DataCacheProvider({ children }) {
   const { profile } = useAuth()
@@ -94,6 +116,13 @@ export function DataCacheProvider({ children }) {
       return currentCache[key].data
     }
 
+    const sessionEntry = !force ? readSessionEntry(profile?.id, key, ttl) : null
+    if (sessionEntry) {
+      cacheRef.current = { ...currentCache, [key]: sessionEntry }
+      setCache(current => ({ ...current, [key]: sessionEntry }))
+      return sessionEntry.data
+    }
+
     // 请求去重：同一key正在请求中，返回同一个Promise
     if (inFlightRef.current[key]) {
       return inFlightRef.current[key]
@@ -109,10 +138,9 @@ export function DataCacheProvider({ children }) {
     try {
       const data = await requestPromise
 
-      setCache(prev => ({
-        ...prev,
-        [key]: { data, timestamp: Date.now() }
-      }))
+      const entry = { data, timestamp: Date.now() }
+      setCache(prev => ({ ...prev, [key]: entry }))
+      writeSessionEntry(profile?.id, key, entry)
 
       cacheTimers.current[key] = setTimeout(() => {
         setCache(prev => {
@@ -126,122 +154,44 @@ export function DataCacheProvider({ children }) {
     } finally {
       delete inFlightRef.current[key]
     }
-  }, [])
+  }, [profile?.id])
 
   useEffect(() => {
     if (!profile?.id) return
 
-    const preloadData = async () => {
-      try {
-        fetchWithCache('anniversaries', async () => {
-          const { data } = await supabase
-            .from('anniversaries')
-            .select('*')
-            .order('date', { ascending: true })
+    // Let the first screen claim the connection first. The former eager preload
+    // fired ten unrelated database queries after sign-in, slowing mobile pages.
+    const warmSecondaryPages = () => {
+      if (navigator.connection?.saveData || /2g/.test(navigator.connection?.effectiveType || '')) return
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = now.getMonth()
+      const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`
+      const lastDay = new Date(year, month + 1, 0).getDate()
+      const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`
+
+      // Warm the most-used data only after the browser is idle. Other pages
+      // continue to use the same on-demand cache, without competing at launch.
+      Promise.allSettled([
+        fetchWithCache(`diaries_${year}_${month}`, async () => {
+          const { data } = await supabase.from('diaries').select('*').gte('created_at', startDate).lte('created_at', `${endDate}T23:59:59`).order('created_at', { ascending: true })
           return data || []
-        })
-
-        fetchWithCache('wishes', async () => {
-          const { data } = await supabase
-            .from('wishes')
-            .select('*')
-            .order('is_completed', { ascending: true })
-            .order('created_at', { ascending: false })
+        }),
+        fetchWithCache(`todos_${year}_${month}`, async () => {
+          const { data } = await supabase.from('todos').select('*').gte('due_date', startDate).lte('due_date', endDate).order('due_date', { ascending: true })
           return data || []
-        })
-
-        fetchWithCache('wallets', async () => {
-          const { data } = await supabase
-            .from('wallets')
-            .select('*')
-            .order('balance', { ascending: false })
-          return data || []
-        })
-
-        fetchWithCache('knowledge_base', async () => {
-          const { data } = await supabase
-            .from('knowledge_base')
-            .select('*')
-            .order('updated_at', { ascending: false })
-          return data || []
-        })
-
-        const now = new Date()
-        const y = now.getFullYear()
-        const m = now.getMonth()
-        const startDate = `${y}-${String(m + 1).padStart(2, '0')}-01`
-        const lastDay = new Date(y, m + 1, 0).getDate()
-        const endDate = `${y}-${String(m + 1).padStart(2, '0')}-${lastDay}`
-
-        fetchWithCache(`diaries_${y}_${m}`, async () => {
-          const { data } = await supabase
-            .from('diaries')
-            .select('*')
-            .gte('created_at', startDate)
-            .lte('created_at', endDate + 'T23:59:59')
-            .order('created_at', { ascending: true })
-          return data || []
-        })
-
-        fetchWithCache(`todos_${y}_${m}`, async () => {
-          const { data } = await supabase
-            .from('todos')
-            .select('*')
-            .gte('due_date', startDate)
-            .lte('due_date', endDate)
-            .order('due_date', { ascending: true })
-          return data || []
-        })
-
+        }),
         fetchWithCache('memos', async () => {
-          const { data } = await supabase
-            .from('memos')
-            .select('*')
-            .order('updated_at', { ascending: false })
+          const { data } = await supabase.from('memos').select('*').order('updated_at', { ascending: false })
           return data || []
         })
-
-        fetchWithCache('albums', async () => {
-          const { data } = await supabase
-            .from('albums')
-            .select('*')
-            .order('created_at', { ascending: false })
-          return data || []
-        })
-
-        fetchWithCache('expenses_recent', async () => {
-          const { data } = await supabase
-            .from('expenses')
-            .select('*')
-            .order('expense_date', { ascending: false })
-            .limit(50)
-          return data || []
-        }, { ttl: 30000 })
-
-        fetchWithCache('transactions_recent', async () => {
-          const { data } = await supabase
-            .from('wallet_transactions')
-            .select('*')
-            .order('transaction_date', { ascending: false })
-            .limit(50)
-          return data || []
-        }, { ttl: 30000 })
-
-        fetchWithCache(`weekly_${y}_${getWeekNumber(now)}`, async () => {
-          const weekNum = getWeekNumber(now)
-          const { data } = await supabase
-            .from('weekly_summaries')
-            .select('*')
-            .eq('year', y)
-            .eq('week_number', weekNum)
-          return data || []
-        })
-      } catch (e) {
-        // preload failures are non-critical
-      }
+      ])
     }
 
-    preloadData()
+    const timeoutId = window.setTimeout(warmSecondaryPages, 900)
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
   }, [profile?.id, fetchWithCache])
 
   const value = {

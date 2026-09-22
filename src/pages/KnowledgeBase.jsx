@@ -69,7 +69,7 @@ export default function KnowledgeBase() {
   return (
     <div className="space-y-4">
       {/* Header with back button */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+      <div className="feature-page-header grid grid-cols-[1fr_auto_1fr] items-center">
         <button
           onClick={() => navigate(-1)}
           className="justify-self-start flex items-center gap-1 text-sm font-bold hover:opacity-70 transition-opacity"

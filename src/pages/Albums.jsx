@@ -420,7 +420,7 @@ export default function Albums() {
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="feature-page-header flex items-center justify-between">
         <button
           onClick={() => {
             if (showPhotoModal) {

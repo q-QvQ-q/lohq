@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { useTheme, THEMES } from '../contexts/ThemeContext.jsx'
+import { useTheme, THEMES, FONT_PRESETS } from '../contexts/ThemeContext.jsx'
 import { supabase } from '../supabase/client.js'
 import PushSettings from '../components/PushSettings.jsx'
 import Icon from '../components/Icon.jsx'
@@ -10,7 +10,7 @@ import ProfileAvatar, { getAvatarStoragePath } from '../components/ProfileAvatar
 export default function Settings() {
   const navigate = useNavigate()
   const { profile, refreshProfile, signOut } = useAuth()
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, font, setFont, fontLoading } = useTheme()
   const [startDate, setStartDate] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -376,14 +376,14 @@ export default function Settings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="settings-page space-y-6">
       {loading && (
         <div className="glass-pill fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 text-xs flex items-center gap-2">
           <Icon name="settings" size={16} /> 加载中...
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="settings-header feature-page-header flex items-center justify-between">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-1 text-sm font-bold hover:opacity-70 transition-opacity"
@@ -397,10 +397,10 @@ export default function Settings() {
         <div style={{ width: '50px' }}></div>
       </div>
 
-      <PushSettings />
+      <div className="settings-push"><PushSettings /></div>
 
       {/* Appearance */}
-      <div className="card">
+      <div className="settings-appearance card">
         <h2 className="font-semibold mb-1 flex items-center gap-2"><Icon name="sun" size={18} /> 外观</h2>
         <p className="text-sm mb-4" style={{ color: 'var(--color-text-light)' }}>选择适合当前环境的显示模式</p>
         <div className="segmented-control" role="group" aria-label="外观模式">
@@ -410,42 +410,51 @@ export default function Settings() {
             </button>
           ))}
         </div>
+        <div className="font-settings" aria-labelledby="font-setting-title">
+          <div>
+            <h3 id="font-setting-title">主题字体</h3>
+            <p>切换界面阅读字体；数字和记录页仍保留站酷快乐体。</p>
+          </div>
+          <div className="font-select-wrap">
+            <select
+              className="font-select"
+              aria-label="选择主题字体"
+              value={fontLoading || font}
+              disabled={Boolean(fontLoading)}
+              onChange={event => setFont(event.target.value)}
+              style={{ fontFamily: FONT_PRESETS[fontLoading || font].family }}
+            >
+              {Object.entries(FONT_PRESETS).map(([key, preset]) => (
+                <option key={key} value={key}>{preset.name} · {preset.description}</option>
+              ))}
+            </select>
+            {fontLoading && <span className="font-loading">正在加载字体…</span>}
+          </div>
+        </div>
       </div>
 
       {/* Profile Card */}
-      <div className="card">
-        <h2 className="font-semibold mb-4 flex items-center gap-2"><Icon name="user" size={18} />个人信息</h2>
+      <div className="settings-profile card">
+        <h2 className="font-semibold mb-3 flex items-center gap-2"><Icon name="user" size={18} />个人信息</h2>
         <div className="space-y-3">
-          <div className="avatar-settings">
-            <div className="avatar-settings__person">
-              <button
-                type="button"
-                className="avatar-settings__button"
-                onClick={() => avatarInputRef.current?.click()}
-                disabled={avatarUploading}
-                aria-label="更换我的头像"
-              >
-                <ProfileAvatar profile={profile} size={76} />
-                <span><Icon name="pencil" size={14} /></span>
-              </button>
-              <strong>{avatarUploading ? '上传中...' : '我的头像'}</strong>
-              <small>点击更换</small>
-              <input
-                ref={avatarInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="sr-only"
-                onChange={handleAvatarChange}
-              />
-            </div>
-            <span className="avatar-settings__link" aria-hidden="true"><Icon name="heart" size={20} /></span>
-            <div className="avatar-settings__person">
-              <ProfileAvatar profile={partnerProfile} size={76} />
-              <strong>{partnerProfile?.nickname || '伴侣头像'}</strong>
-              <small>{partnerProfile ? '由对方设置' : '绑定后显示'}</small>
-            </div>
-          </div>
-          <div>
+          <div className="profile-identity-row">
+            <button
+              type="button"
+              className="profile-identity-row__avatar"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={avatarUploading}
+              aria-label="更换我的头像"
+            >
+              <ProfileAvatar profile={profile} size={48} />
+              <span><Icon name="pencil" size={12} /></span>
+            </button>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="sr-only"
+              onChange={handleAvatarChange}
+            />
             <label className="label-text">昵称</label>
             <input
               type="text"
@@ -495,8 +504,8 @@ export default function Settings() {
       </div>
 
       {/* 伴侣绑定 */}
-      <div className="card">
-        <h2 className="font-semibold mb-4 flex items-center gap-2"><Icon name="users" size={18} />伴侣绑定</h2>
+      <div className="settings-couple card">
+        <h2 className="font-semibold mb-4 flex items-center gap-2"><Icon name="users" size={18} />伴侣与恋爱设置</h2>
         
         {/* 已绑定状态 - 有 partner_id 就显示 */}
         {(profile?.partner_id || bindingStatus === 'bound') && (
@@ -618,37 +627,34 @@ export default function Settings() {
             )}
           </div>
         )}
-      </div>
-
-      {/* Love Date */}
-      <div className="card">
-        <h2 className="font-semibold mb-4 flex items-center gap-2"><Icon name="heart" size={18} />恋爱设置</h2>
-        <div>
+        <div className="couple-date-setting">
           <label className="label-text">在一起的日期</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="input-field"
-            disabled={bindingStatus === 'bound' && profile?.partner_id}
-          />
+          <div className="couple-date-setting__controls">
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="input-field"
+              disabled={bindingStatus === 'bound' && profile?.partner_id}
+            />
+            <button
+              onClick={handleSaveDate}
+              className="btn-primary"
+              disabled={saving}
+            >
+              {saving ? '保存中...' : '保存'}
+            </button>
+          </div>
           {bindingStatus === 'bound' && profile?.partner_id && (
             <p className="text-xs mt-1" style={{ color: 'var(--color-text-light)', opacity: 0.6 }}>
               绑定后修改日期需要对方同意
             </p>
           )}
         </div>
-        <button
-          onClick={handleSaveDate}
-          className="btn-primary w-full mt-4"
-          disabled={saving}
-        >
-          {saving ? '保存中...' : '保存日期'}
-        </button>
       </div>
 
       {/* Data Management */}
-      <div className="card">
+      <div className="settings-data card">
         <h2 className="font-semibold mb-4 flex items-center gap-2"><Icon name="download" size={18} />数据管理</h2>
         <p className="text-xs mb-3" style={{ color: 'var(--color-text-light)' }}>
           导出所有数据为 JSON 文件，用于备份或迁移
@@ -662,7 +668,7 @@ export default function Settings() {
       </div>
 
       {/* Logout */}
-      <div className="card text-center">
+      <div className="settings-logout card text-center">
         <button
           onClick={async () => {
             await signOut()
@@ -673,7 +679,7 @@ export default function Settings() {
         </button>
       </div>
 
-      <div className="text-center text-xs" style={{ color: 'var(--color-text-light)', opacity: 0.5 }}>
+      <div className="settings-footer text-center text-xs" style={{ color: 'var(--color-text-light)', opacity: 0.5 }}>
         LOHQ v0.2.0 · 我们的恋爱小窝
       </div>
     </div>

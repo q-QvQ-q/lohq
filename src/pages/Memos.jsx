@@ -269,14 +269,14 @@ export default function Memos() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="keepsake-font space-y-4">
       {loading && (
         <div className="glass-pill fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 text-xs flex items-center gap-2">
           <Icon name="note" size={16} /> 加载中...
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="feature-page-header flex items-center justify-between">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-1 text-sm font-bold hover:opacity-70 transition-opacity"
@@ -397,29 +397,27 @@ export default function Memos() {
                     {memoComments.length > 0 ? (
                       <div className="space-y-2 mb-3">
                         {memoComments.map(comment => (
-                          <div key={comment.id} className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: 'var(--color-primary-light)' }}>
-                            <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0" 
-                                 style={{ backgroundColor: 'var(--color-primary-dark)', color: 'white' }}>
+                          <div key={comment.id} className="memo-comment flex items-start gap-2 p-2 rounded-lg">
+                            <div className="memo-comment__avatar w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0">
                               {(comment.author_profile?.nickname || '宝')[0]}
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold" style={{ color: 'var(--color-text)' }}>
+                                <span className="memo-comment__author text-xs font-bold">
                                   {nameOf(comment.author_id)}
                                 </span>
-                                <span className="text-xs" style={{ color: 'var(--color-text-light)', opacity: 0.6 }}>
+                                <span className="memo-comment__time text-xs">
                                   {formatTime(comment.created_at)}
                                 </span>
                               </div>
-                              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text)' }}>
+                              <p className="memo-comment__content text-xs mt-0.5">
                                 {comment.content}
                               </p>
                             </div>
                             {comment.author_id === profile?.id && (
                               <button
                                 onClick={() => deleteComment(comment.id)}
-                                className="text-xs hover:opacity-70 flex-shrink-0"
-                                style={{ color: 'var(--color-text-light)' }}
+                                className="memo-comment__delete text-xs hover:opacity-70 flex-shrink-0"
                               >
                                 <Icon name="x" size={15} />
                               </button>

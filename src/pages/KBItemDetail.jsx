@@ -64,7 +64,7 @@ export default function KBItemDetail() {
           <Icon name="book" size={16} /> 加载中...
         </div>
       )}
-      <div className="flex items-center justify-between">
+      <div className="feature-page-header flex items-center justify-between">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-1 text-sm font-bold hover:opacity-70 transition-opacity"

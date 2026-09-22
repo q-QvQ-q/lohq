@@ -144,8 +144,8 @@ export default function Reflections() {
   }
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between gap-3">
+    <div className="keepsake-font space-y-4 animate-fade-in">
+      <div className="feature-page-header flex items-center justify-between gap-3">
         <button type="button" onClick={back} className="text-sm font-bold hover:opacity-70">← 返回</button>
         <h1 className="page-title !mb-0"><Icon name="file" size={22} />检讨书</h1>
         {view === 'list' ? (

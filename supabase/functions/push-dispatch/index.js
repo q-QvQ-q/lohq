@@ -22,8 +22,19 @@ function requireValue(name) {
 }
 
 function safePath(value) {
-  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//')
-    ? value : '/notifications'
+  if (typeof value !== 'string') return '/notifications'
+  const candidate = value.trim()
+  if (!candidate.startsWith('/') || candidate.startsWith('//') || candidate.includes('\\')) {
+    return '/notifications'
+  }
+  try {
+    const decoded = decodeURIComponent(candidate)
+    return decoded.startsWith('//') || decoded.includes('\\') || /[\u0000-\u001f\u007f]/.test(decoded)
+      ? '/notifications'
+      : candidate
+  } catch {
+    return '/notifications'
+  }
 }
 
 function allowedPushEndpoint(value) {

@@ -40,7 +40,7 @@ export default function Calendar({ previewData = null }) {
   const location = useLocation()
   const targetTodoId = new URLSearchParams(location.search).get('todo')
   const targetAnniversaryId = new URLSearchParams(location.search).get('anniversary')
-  const { profile } = useAuth()
+  const { profile, partnerProfile } = useAuth()
   const { fetchWithCache, invalidateByPrefix, profileMap } = useDataCache()
   
   const nameOf = (id, fallback = '宝宝') => id ? (profileMap[id]?.nickname || fallback) : fallback
@@ -424,14 +424,14 @@ export default function Calendar({ previewData = null }) {
   const allAnniversaries = anniversaries
 
   return (
-    <div className="space-y-5">
+    <div className="keepsake-font space-y-5">
       {loading && (
         <div className="glass-pill fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 text-xs flex items-center gap-2">
           <Icon name="calendar" size={16} /> 加载中...
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="feature-page-header flex items-center justify-between">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-1 text-sm font-bold hover:opacity-70 transition-opacity"
@@ -480,7 +480,14 @@ export default function Calendar({ previewData = null }) {
           const hasDiary = dayDiaries.length > 0
           const hasTodo = dayTodos.length > 0
           const hasAnniversary = dayAnniversaries.length > 0
-          const diaryMood = hasDiary ? (MOODS[dayDiaries[dayDiaries.length - 1]?.mood] || MOODS.normal) : null
+          const latestDiaryByAuthor = new Map()
+          dayDiaries.forEach(diary => latestDiaryByAuthor.set(diary.author_id, diary))
+          const authorOrder = [profile?.id, partnerProfile?.id, ...latestDiaryByAuthor.keys()]
+          const dayMoods = [...new Set(authorOrder)]
+            .map(authorId => latestDiaryByAuthor.get(authorId))
+            .filter(Boolean)
+            .slice(0, 2)
+            .map(diary => MOODS[diary.mood] || MOODS.normal)
           const isSelected = getDateKey(selectedDate) === getDateKey(date)
           const isCurrentDay = isToday(date)
           
@@ -497,7 +504,11 @@ export default function Calendar({ previewData = null }) {
                 {date.getDate()}
               </span>
               <div className="calendar-day__markers" aria-hidden="true">
-                {hasDiary && <span className="calendar-mood"><Icon name={diaryMood.icon} size={11} /></span>}
+                {hasDiary && (
+                  <span className={`calendar-day__moods${dayMoods.length > 1 ? ' has-pair' : ''}`}>
+                    {dayMoods.map((mood, moodIndex) => <span className="calendar-mood" key={`${mood.icon}-${moodIndex}`}><Icon name={mood.icon} size={11} /></span>)}
+                  </span>
+                )}
                 {hasTodo && <span className="calendar-dot" />}
               </div>
             </button>

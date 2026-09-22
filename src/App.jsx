@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext.jsx'
 import { ThemeProvider } from './contexts/ThemeContext.jsx'
 import { DataCacheProvider } from './contexts/DataCacheContext.jsx'
+import { PresenceProvider } from './contexts/PresenceContext.jsx'
 import Layout from './components/Layout.jsx'
 import Icon from './components/Icon.jsx'
 import Login from './pages/Login.jsx'
@@ -17,11 +18,13 @@ const Settings = lazy(() => import('./pages/Settings.jsx'))
 const Calendar = lazy(() => import('./pages/Calendar.jsx'))
 const Wishes = lazy(() => import('./pages/Wishes.jsx'))
 const Albums = lazy(() => import('./pages/Albums.jsx'))
-const Wallet = lazy(() => import('./pages/Wallet.jsx'))
 const Memos = lazy(() => import('./pages/Memos.jsx'))
 const Notifications = lazy(() => import('./pages/Notifications.jsx'))
 const WeeklySummaries = lazy(() => import('./pages/WeeklySummaries.jsx'))
 const Reflections = lazy(() => import('./pages/Reflections.jsx'))
+const SweetShop = lazy(() => import('./pages/SweetShop.jsx'))
+const CheckIns = lazy(() => import('./pages/CheckIns.jsx'))
+const FutureLetters = lazy(() => import('./pages/FutureLetters.jsx'))
 
 const HOME_PREVIEW_DATA = {
   profile: { id: 'preview-me', nickname: '小蓝', avatar_url: '' },
@@ -101,12 +104,16 @@ export default function App() {
   return (
     <ThemeProvider>
       <DataCacheProvider>
-        <Suspense fallback={<PageLoading />}>
+        <PresenceProvider>
+          <Suspense fallback={<PageLoading />}>
           <Routes>
             {import.meta.env.DEV && (
               <Route path="/__preview" element={<Layout />}>
                 <Route path="home" element={<Home previewData={HOME_PREVIEW_DATA} />} />
                 <Route path="calendar" element={<Calendar previewData={CALENDAR_PREVIEW_DATA} />} />
+                <Route path="shop" element={<SweetShop preview />} />
+                <Route path="check-ins" element={<CheckIns preview />} />
+                <Route path="future-letters" element={<FutureLetters preview />} />
               </Route>
             )}
             <Route
@@ -141,7 +148,10 @@ export default function App() {
               <Route path="knowledge/:id/edit" element={<KBItemForm />} />
               <Route path="wishes" element={<Wishes />} />
               <Route path="albums" element={<Albums />} />
-              <Route path="wallet" element={<Wallet />} />
+              <Route path="wallet" element={<Navigate to="/shop" replace />} />
+              <Route path="shop" element={<SweetShop />} />
+              <Route path="check-ins" element={<CheckIns />} />
+              <Route path="future-letters" element={<FutureLetters />} />
               <Route path="memos" element={<Memos />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="weekly" element={<WeeklySummaries />} />
@@ -150,7 +160,8 @@ export default function App() {
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
-        </Suspense>
+          </Suspense>
+        </PresenceProvider>
       </DataCacheProvider>
     </ThemeProvider>
   )
